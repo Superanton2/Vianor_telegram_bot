@@ -1,6 +1,7 @@
 from aiogram import Router, F, types
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from app.utils.func import clean_reply_markup
 
 from app.utils.csv_handler import CSVHandler
 import os
@@ -15,6 +16,8 @@ handler = CSVHandler(FAQ_FILE_PATH)
 # [key: id -> question,answer]
 @router.callback_query(F.data == "questions")
 async def show_faq(callback: types.CallbackQuery):
+    await clean_reply_markup(callback)
+
     questions = handler.get_questions()
     if not questions:
         await callback.answer("Помилка: Файл питань порожній або не знайдений", show_alert=True)
@@ -38,6 +41,8 @@ async def show_faq(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("faq_answer_"))
 async def answer_faq(callback: types.CallbackQuery):
+    await clean_reply_markup(callback)
+
     question_id = int(callback.data.split("_")[2])
     answer = handler.get_answer_by_id(question_id)
     if not answer:

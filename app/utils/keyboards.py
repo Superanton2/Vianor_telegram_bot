@@ -3,9 +3,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 def create_main_keyboard(admin: bool= False) -> InlineKeyboardBuilder:
     builder = InlineKeyboardBuilder()
 
-
-    builder.button( text="Записатись", callback_data="handle_questions")
-    builder.button( text="Мої записи", callback_data="handle_payment")
+    builder.button( text="Записатись", callback_data="enroll")
+    builder.button( text="❓ Часті Питання", callback_data="questions")
 
     if admin:
         builder.button( text="🔐 Панель Адміна", callback_data="admin_hub")
