@@ -1,4 +1,2 @@
-FROM ubuntu:latest
-LABEL authors="home"
-
-ENTRYPOINT ["top", "-b"]
+FROM python3.12
+CMD main.py
