@@ -1,13 +1,20 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-def create_main_keyboard(admin: bool= False) -> InlineKeyboardBuilder:
+def create_main_user_keyboard(is_new: bool= False):
     builder = InlineKeyboardBuilder()
 
-    builder.button( text="Записатись", callback_data="enroll")
-    builder.button( text="❓ Часті Питання", callback_data="questions")
+    if is_new:
+        builder.button(text="Зареєструватись", callback_data="register")
+    else:
+        builder.button(text="Записатись", callback_data="enroll")
+        builder.button(text="❓ Часті Питання", callback_data="questions")
 
-    if admin:
-        builder.button( text="🔐 Панель Адміна", callback_data="admin_hub")
 
     builder.adjust(1)
     return builder
+
+def create_main_worker_keyboard():
+    pass
+
+def create_main_admin_keyboard():
+    pass
