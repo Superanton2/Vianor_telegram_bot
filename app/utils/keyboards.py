@@ -7,6 +7,7 @@ def create_main_user_keyboard(is_new: bool= False):
         builder.button(text="Зареєструватись", callback_data="registration")
     else:
         builder.button(text="Записатись", callback_data="enroll")
+        builder.button(text="👤 Мій профіль", callback_data="profile")
         builder.button(text="❓ Часті Питання", callback_data="questions")
 
 
