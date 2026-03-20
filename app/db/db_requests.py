@@ -1,4 +1,4 @@
-from sqlalchemy import select, insert
+from sqlalchemy import select, insert, update
 from app.db.db_setup import engine, bookings, admin_list, worker_list, user_list
 
 async def add_user(tg_id: int, user_type: str, car_num: str, name: str = None, phone: str = None) -> None:
@@ -21,7 +21,7 @@ async def add_user(tg_id: int, user_type: str, car_num: str, name: str = None, p
         )
         await conn.execute(insert_statement)
 
-async def get_user(tg_id: int) -> str | None:
+async def get_user(tg_id: int):
     """
     Fing user data in db
     :param tg_id:
@@ -30,9 +30,25 @@ async def get_user(tg_id: int) -> str | None:
     async with engine.begin() as conn:
         select_statement = select(user_list).where(user_list.c.telegram_id == tg_id)
         result = await conn.execute(select_statement)
-        print(type(result.fetchone()))
         return result.fetchone()
 
+async def update_user_field(tg_id: int, field_name: str, new_value: str) -> None:
+    """
+    update particular field in user db
+    :param tg_id: id of user
+    :param field_name: field to change. Have to be 'name', 'phone' or 'car_number'
+    :param new_value: value to write
+    :return: None
+    """
+    async with engine.begin() as conn:
+        update_data = {field_name: new_value}
+
+        update_statement = (
+            update(user_list)
+            .where(user_list.c.telegram_id == tg_id)
+            .values(**update_data)
+        )
+        await conn.execute(update_statement)
 
 async def add_booking(tg_id: int, b_date, b_time, service: str) -> None:
     """
