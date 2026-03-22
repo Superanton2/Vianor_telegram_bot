@@ -1,12 +1,13 @@
-from sqlalchemy import select, insert, update
-from app.db.db_setup import engine, bookings, admin_list, worker_list, user_list
+import datetime
 
-async def add_user(tg_id: int, user_type: str, car_num: str, name: str = None, phone: str = None) -> None:
+from sqlalchemy import select, insert, update, func
+from app.db.db_setup import engine, bookings, admin_list, worker_list, user_list, cars
+
+async def add_user(tg_id: int, user_type: str, name: str = None, phone: str = None) -> None:
     """
     add user to db
     :param tg_id: telegram id of user
     :param user_type: 'individual' or 'business'
-    :param car_num: car number 'AA1234BB'
     :param name: Ures name
     :param phone: +380 ...
     :return: None
@@ -16,8 +17,23 @@ async def add_user(tg_id: int, user_type: str, car_num: str, name: str = None, p
             telegram_id=tg_id,
             type=user_type,
             name=name,
-            phone=phone,
-            car_number=car_num
+            phone=phone
+        )
+        await conn.execute(insert_statement)
+
+async def add_car(tg_id: int, car_number: str, car_type: str) -> None:
+    """
+    Add car to db
+    :param tg_id: telegram id of user
+    :param car_number: car number 'AA1234BB'
+    :param car_type: 'passenger' / 'off_roader' / 'van'
+    :return:
+    """
+    async with engine.begin() as conn:
+        insert_statement = insert(cars).values(
+            number=car_number,
+            type=car_type,
+            user_id=tg_id
         )
         await conn.execute(insert_statement)
 
@@ -128,3 +144,39 @@ async def is_user_in_role(tg_id: int, role: str) -> bool:
             return True
         else:
             return False
+
+
+async def get_booked_times(target_date: datetime.date) -> list[str]:
+    """
+    Повертає список зайнятих годин на конкретну дату у форматі ["10:00", "14:00"].
+    Враховуються лише активні записи.
+    """
+    async with engine.begin() as conn:
+        # Вибираємо лише колонку time
+        select_statement = select(bookings.c.time).where(
+            (bookings.c.date == target_date) &
+            (bookings.c.status == "active")
+        )
+        result = await conn.execute(select_statement)
+
+        # result.fetchall() повертає список рядків (Row)
+        # Рядок виглядає як (datetime.time(10, 0),) тому беремо row[0]
+        # І відразу форматуємо об'єкт часу в рядок "ГГ:ХХ"
+        return [row[0].strftime("%H:%M") for row in result.fetchall()]
+
+
+async def check_if_day_full(target_date: datetime.date, total_slots: int) -> bool:
+    """
+    Перевіряє, чи кількість активних записів на день дорівнює або перевищує
+    загальну кількість робочих годин.
+    """
+    async with engine.begin() as conn:
+        # Використовуємо SQL COUNT для швидкого підрахунку
+        select_statement = select(func.count()).select_from(bookings).where(
+            (bookings.c.date == target_date) &
+            (bookings.c.status == "active")
+        )
+        result = await conn.execute(select_statement)
+        count = result.scalar()
+
+        return count >= total_slots

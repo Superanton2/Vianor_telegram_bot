@@ -9,7 +9,7 @@ from sqlalchemy import select
 import app.utils.keyboards as kb
 
 from app.routers.faq_router import router as faq_router
-from app.routers.enroll_router import router as enroll_router
+from app.routers.booking_router import router as booking_router
 from app.routers.registration_router import router as registration_router
 from app.routers.profile_router import router as profile_router
 
@@ -17,7 +17,7 @@ load_dotenv()
 router = Router()
 router.include_routers(
     faq_router,
-    enroll_router,
+    booking_router,
     registration_router,
     profile_router,
 )
@@ -28,9 +28,9 @@ async def cmd_start(message: types.Message):
     keyboard = kb.create_main_user_keyboard()
 
     tg_id = message.from_user.id
-    if await is_user_in_role(tg_id, "admin"):
-        text = "Привіт admin"
-    elif await is_user_in_role(tg_id, "worker"):
+    # if await is_user_in_role(tg_id, "admin"):
+    #     text = "Привіт admin"
+    if await is_user_in_role(tg_id, "worker"):
         text = "Вітаю worker"
     elif await is_user_in_role(tg_id, "user"):
         text = ("👋Привіт!\nЯ бот для запису на мийку vianor. \n"
@@ -53,8 +53,8 @@ async def cmd_back_hub(callback: types.CallbackQuery):
         pass
 
     tg_id = callback.from_user.id
-    if await is_user_in_role(tg_id, "admin"):
-        text = "Привіт admin"
+    # if await is_user_in_role(tg_id, "admin"):
+    #     text = "Привіт admin"
     if await is_user_in_role(tg_id, "worker"):
         text = "Вітаю worker"
     elif await is_user_in_role(tg_id, "user"):
