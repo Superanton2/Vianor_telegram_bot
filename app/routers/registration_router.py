@@ -4,6 +4,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from app.db.db_requests import add_user, add_car
+import logging
 
 router = Router()
 
@@ -25,10 +26,10 @@ async def start_registration(callback: types.CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
     builder.button(text="👤 Приватна особа", callback_data="type_individual")
     builder.button(text="🏢 Юридична особа", callback_data="type_business")
-    builder.adjust(2)
+    builder.adjust(1)
 
     await callback.message.answer(
-        "Давайте зареєструємось!\nОберіть ваш тип:",
+        "[1/5] Давайте зареєструємось!\nОберіть ваш тип:",
         reply_markup=builder.as_markup()
     )
 
@@ -45,11 +46,13 @@ async def process_type(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(user_type=user_type)
 
     if user_type == "individual":
-        text = "Введіть ваше ім'я та прізвище:"
+        text = "[2/5] Введіть ваше ім'я та прізвище:"
     else:
-        text = "Введіть назву вашої компанії:"
+        text = "[2/5] Введіть назву вашої компанії:"
 
-    await callback.message.answer(text)
+    await state.update_data(main_message_id=callback.message.message_id)
+
+    await callback.message.edit_text(text)
 
     await state.set_state(RegisterForm.entering_name)
     await callback.answer()
@@ -59,27 +62,66 @@ async def process_type(callback: types.CallbackQuery, state: FSMContext):
 async def process_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
 
+    data = await state.get_data()
+    main_msg_id = data.get("main_message_id")
+
+    # delete message from user
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+    # delete old main massage
+    if main_msg_id:
+        try:
+            await message.bot.delete_message(chat_id=message.chat.id, message_id=main_msg_id)
+        except Exception:
+            pass
+
+
     builder = ReplyKeyboardBuilder()
     builder.button(text="📱 Надіслати мій номер", request_contact=True)
 
-    await message.answer(
-        "Введіть ваш номер телефону (або натисніть кнопку нижче, щоб поділитися контактом):",
+    new_msg = await message.answer(
+        "[3/5] Введіть ваш номер телефону або натисніть кнопку нижче:",
         reply_markup=builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
     )
+    await state.update_data(main_message_id=new_msg.message_id)
     await state.set_state(RegisterForm.entering_phone)
 
 
 @router.message(RegisterForm.entering_phone)
 async def process_phone(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    main_msg_id = data.get("main_message_id")
+
+    # delete message from user
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+    # delete old main massage
+    if main_msg_id:
+        try:
+            await message.bot.delete_message(chat_id=message.chat.id, message_id=main_msg_id)
+        except Exception:
+            pass
+
     if message.contact:
         phone = message.contact.phone_number
     elif message.text:
         phone = message.text
     else:
-        await message.answer("Будь ласка, надішліть номер телефону текстом або контактом.")
+        await message.answer("[3/5] Будь ласка, надішліть номер телефону текстом або контактом.")
         return
 
     await state.update_data(phone=phone)
+
+    try:
+        await message.delete_reply_markup()
+    except Exception:
+        pass
 
     builder = InlineKeyboardBuilder()
     builder.button(text="🚗 Легковий", callback_data="car_type_passenger")
@@ -87,11 +129,11 @@ async def process_phone(message: types.Message, state: FSMContext):
     builder.button(text="🚐 Мінівен / Бус", callback_data="car_type_van")
     builder.adjust(1)
 
+
     await message.answer(
-        "Оберіть тип вашого автомобіля:",
-        reply_markup=types.ReplyKeyboardRemove()
+        "[4/5] Оберіть тип вашого автомобіля:",
+        reply_markup=builder.as_markup()
     )
-    await message.answer("Тип авто:", reply_markup=builder.as_markup())
 
     await state.set_state(RegisterForm.entering_car_type)
 
@@ -107,9 +149,11 @@ async def process_car_type(callback: types.CallbackQuery, state: FSMContext):
     car_type = type_mapping.get(callback.data)
     await state.update_data(car_type=car_type)
 
-    await callback.message.edit_text(
-        "Супер! Останній крок: введіть державний номер вашого авто (наприклад, AA1234BB):"
+    new_msg = await callback.message.edit_text(
+        "[5/5] Введіть державний номер вашого авто (наприклад, AA1234BB):"
     )
+    await state.update_data(main_message_id=new_msg.message_id)
+
     await state.set_state(RegisterForm.entering_car_number)
     await callback.answer()
 
@@ -138,6 +182,15 @@ async def process_car_number(message: types.Message, state: FSMContext):
             car_type=car_type
         )
 
+        data = await state.get_data()
+        main_msg_id = data.get("main_message_id")
+
+        # delete user massage
+        try:
+            await message.delete()
+        except Exception:
+            pass
+
         builder = InlineKeyboardBuilder()
         builder.button(text="Продовжити", callback_data="controller_hub", style="primary")
 
@@ -147,8 +200,10 @@ async def process_car_number(message: types.Message, state: FSMContext):
             "van": "Мінівен / Бус"
         }.get(car_type, car_type)
 
-        await message.answer(
-            f"🎉 <b>Реєстрація успішна!</b>\n\n"
+        await message.bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=main_msg_id,
+            text=f"🎉 <b>Реєстрація успішна!</b>\n\n"
             f"👤 Ваші дані: {name}\n"
             f"📱 Телефон: {phone}\n"
             f"🚗 Авто: {car_number} ({display_type})\n\n"
@@ -156,92 +211,13 @@ async def process_car_number(message: types.Message, state: FSMContext):
             reply_markup=builder.as_markup()
         )
     except Exception as e:
-        print(f"Помилка БД під час реєстрації: {e}")
-        await message.answer("Виникла помилка. Можливо, такий номер авто вже існує або ви вже зареєстровані.")
+        builder = InlineKeyboardBuilder()
+        builder.button(text="Спробувати ще раз", callback_data="registration", style="primary")
+        logging.error(f"\033[31mПомилка БД під час реєстрації: {e}\033[0m")
+
+        await message.answer(
+            text="Виникла помилка. Можливо, такий номер авто вже існує або ви вже зареєстровані.",
+            reply_markup=builder.as_markup()
+        )
 
     await state.clear()
-
-# @router.message(RegisterForm.entering_phone)
-# async def process_phone(message: types.Message, state: FSMContext):
-#     if message.contact:
-#         phone = message.contact.phone_number
-#     elif message.text:
-#         phone = message.text
-#     else:
-#         await message.answer("Будь ласка, надішліть номер телефону текстом або контактом.")
-#         return
-#
-#     await state.update_data(phone=phone)
-#
-#     builder = InlineKeyboardBuilder()
-#     builder.button(text="🚗 Легковий", callback_data="cat_passenger")
-#     builder.button(text="🚙 Позашляховик", callback_data="cat_off_roader")
-#     builder.button(text="🚐 Мінівен / Бус", callback_data="cat_van")
-#     builder.adjust(1)
-#
-#     # await state.set_state(BookingForm.choosing_category)
-#     await message.edit_text("Оберіть категорію вашого авто:", reply_markup=builder.as_markup())
-#
-#     await message.answer(
-#         "Вкажіть тип вашого авто",
-#         reply_markup=types.ReplyKeyboardRemove()
-#     )
-#     await state.set_state(RegisterForm.entering_car_type)
-#
-# @router.message(RegisterForm.entering_car_type)
-# async def process_phone(message: types.Message, state: FSMContext):
-#     if message.contact:
-#         phone = message.contact.phone_number
-#     elif message.text:
-#         phone = message.text
-#     else:
-#         await message.answer("Будь ласка, надішліть номер телефону текстом або контактом.")
-#         return
-#
-#     await state.update_data(phone=phone)
-#
-#     await message.answer(
-#         "Супер! Останній крок: введіть державний номер вашого авто (наприклад, AA1234BB):",
-#         reply_markup=types.ReplyKeyboardRemove()
-#     )
-#     await state.set_state(RegisterForm.entering_car_number)
-#
-#
-# @router.message(RegisterForm.entering_car_number, F.text)
-# async def process_car(message: types.Message, state: FSMContext):
-#     car_number = message.text
-#
-#     data = await state.get_data()
-#     user_type = data['user_type']
-#     name = data['name']
-#     phone = data['phone']
-#
-#     try:
-#         await add_user(
-#             tg_id=message.from_user.id,
-#             user_type=user_type,
-#             name=name,
-#             phone=phone
-#         )
-#         await add_car(
-#             car_num=car_number,
-#         )
-#
-#         builder = InlineKeyboardBuilder()
-#
-#         builder.button(text="Продовжити", callback_data="controller_hub", style="primary")
-#
-#         await message.answer(
-#             f"🎉 <b>Реєстрація успішна!</b>\n\n"
-#             f"👤 Ваші дані: {name}\n"
-#             f"📱 Телефон: {phone}\n"
-#             f"🚗 Авто: {car_number}\n\n"
-#             f"Тепер ви можете записатися на мийку.",
-#             reply_markup=builder.as_markup()
-#         )
-#
-#     except Exception as e:
-#         print(f"Помилка реєстрації БД: {e}")
-#         await message.answer("Виникла помилка при збереженні. Можливо, ви вже зареєстровані.")
-#
-#     await state.clear()

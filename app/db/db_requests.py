@@ -31,7 +31,7 @@ async def add_car(tg_id: int, car_number: str, car_type: str) -> None:
     """
     async with engine.begin() as conn:
         insert_statement = insert(cars).values(
-            number=car_number,
+            car_number=car_number,
             type=car_type,
             user_id=tg_id
         )

@@ -39,18 +39,6 @@ user_list = Table(
     Column("phone", String, nullable=False),
 )
 
-bookings = Table(
-    "bookings",
-    meta,
-    Column("id", Integer, primary_key=True, autoincrement=True),
-    Column("date", Date, nullable=False),
-    Column("time", Time, nullable=False),
-    Column("service", String),
-    Column("user_id", BigInteger, ForeignKey('user_list.telegram_id')),
-    Column("status", String, default="active"),
-    Column("car_number", String, ForeignKey('cars.car_number'))
-)
-
 cars = Table(
     "cars",
     meta,
@@ -58,6 +46,18 @@ cars = Table(
     Column("car_number", String, nullable=False, unique=True), # AA1234BB
     Column("type", String, nullable=False), # 'passenger' / 'off_roader' / 'van'
     Column("user_id", BigInteger, ForeignKey('user_list.telegram_id')) # car owner
+)
+
+bookings = Table(
+    "bookings",
+    meta,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("date", Date, nullable=False),
+    Column("time", Time, nullable=False),
+    Column("service", String),
+    Column("status", String, default="active"),
+    Column("user_id", BigInteger, ForeignKey('user_list.telegram_id')),
+    Column("car_number", String, ForeignKey('cars.car_number'))
 )
 
 async def init_db():
