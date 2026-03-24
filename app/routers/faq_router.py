@@ -54,7 +54,7 @@ async def answer_faq(callback: types.CallbackQuery):
     builder.add(
         types.InlineKeyboardButton(
             text="Назад",
-            callback_data="controller_hub",
+            callback_data="controller_hub_new",
             style="primary"
         )
     )

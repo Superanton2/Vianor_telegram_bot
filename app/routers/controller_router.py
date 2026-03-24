@@ -3,10 +3,11 @@ from dotenv import load_dotenv
 from aiogram import F
 from aiogram.filters import Command
 from aiogram import Router, types
+from aiogram.fsm.context import FSMContext
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 import app.utils.keyboards as kb
+from app.utils.funcs import safe_reply
+from app.db.db_requests import is_user_in_role, get_user
 
 from app.routers.faq_router import router as faq_router
 from app.routers.booking_router import router as booking_router
@@ -21,7 +22,6 @@ router.include_routers(
     registration_router,
     profile_router,
 )
-from app.db.db_requests import is_user_in_role, get_user
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -45,24 +45,32 @@ async def cmd_start(message: types.Message):
         reply_markup= keyboard.as_markup()
     )
 
-@router.callback_query(F.data == "controller_hub")
-async def cmd_back_hub(callback: types.CallbackQuery):
+@router.callback_query(F.data.in_(["controller_hub", "controller_hub_new"]))
+async def cmd_back_hub(callback: types.CallbackQuery, state: FSMContext):
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
     except Exception:
         pass
+    await state.clear()
 
     tg_id = callback.from_user.id
-    # if await is_user_in_role(tg_id, "admin"):
-    #     text = "Привіт admin"
-    if await is_user_in_role(tg_id, "worker"):
-        text = "Вітаю worker"
-    elif await is_user_in_role(tg_id, "user"):
+    if await is_user_in_role(tg_id, "user"):
         text = "👋Обери наступну дію:"
         keyboard = kb.create_main_user_keyboard()
+    elif await is_user_in_role(tg_id, "worker"):
+        text = "Вітаю worker"
+    elif await is_user_in_role(tg_id, "admin"):
+        text = "Привіт admin"
 
 
-    await callback.message.answer(
-        text=text,
-        reply_markup=keyboard.as_markup()
-    )
+    if callback.data == "controller_hub_new":
+        await safe_reply(
+            message=callback.message,
+            text=text,
+            reply_markup=keyboard.as_markup()
+        )
+    else:
+        await callback.message.answer(
+            text=text,
+            reply_markup=keyboard.as_markup()
+        )

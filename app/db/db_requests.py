@@ -180,3 +180,23 @@ async def check_if_day_full(target_date: datetime.date, total_slots: int) -> boo
         count = result.scalar()
 
         return count >= total_slots
+
+async def get_user_cars(tg_id: int):
+    """Повертає список автомобілів користувача"""
+    async with engine.begin() as conn:
+        select_statement = select(cars).where(cars.c.user_id == tg_id)
+        result = await conn.execute(select_statement)
+        return result.fetchall()
+
+async def add_booking(tg_id: int, b_date, b_time, service: str, car_number: str) -> None:
+    """Створює запис на мийку з прив'язкою до авто"""
+    async with engine.begin() as conn:
+        insert_statement = insert(bookings).values(
+            date=b_date,
+            time=b_time,
+            service=service,
+            user_id=tg_id,
+            car_number=car_number,
+            status="active"
+        )
+        await conn.execute(insert_statement)

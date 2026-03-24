@@ -4,6 +4,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from app.db.db_requests import add_user, add_car
+from app.utils.funcs import get_car_emoji
 import logging
 
 router = Router()
@@ -192,7 +193,9 @@ async def process_car_number(message: types.Message, state: FSMContext):
             pass
 
         builder = InlineKeyboardBuilder()
-        builder.button(text="Продовжити", callback_data="controller_hub", style="primary")
+        builder.button(text="Продовжити", callback_data="controller_hub", style="success")
+
+        car_emoji = get_car_emoji(data['car_type'])
 
         display_type = {
             "passenger": "Легковий",
@@ -200,13 +203,14 @@ async def process_car_number(message: types.Message, state: FSMContext):
             "van": "Мінівен / Бус"
         }.get(car_type, car_type)
 
+
         await message.bot.edit_message_text(
             chat_id=message.chat.id,
             message_id=main_msg_id,
             text=f"🎉 <b>Реєстрація успішна!</b>\n\n"
             f"👤 Ваші дані: {name}\n"
             f"📱 Телефон: {phone}\n"
-            f"🚗 Авто: {car_number} ({display_type})\n\n"
+            f"{car_emoji}: {car_number} ({display_type})\n\n"
             f"Тепер ви можете записатися на мийку.",
             reply_markup=builder.as_markup()
         )
