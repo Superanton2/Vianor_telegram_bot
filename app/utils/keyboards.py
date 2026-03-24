@@ -9,7 +9,7 @@ def create_main_user_keyboard(is_new: bool= False) -> InlineKeyboardBuilder:
     else:
         builder.button(text="📅 Записатись", callback_data="booking")
         builder.button(text="👤 Мій профіль", callback_data="profile")
-        builder.button(text="❓ Часті Питання", callback_data="questions")
+        builder.button(text="❓ Часті Питання", callback_data="questions_new")
 
 
     builder.adjust(1)

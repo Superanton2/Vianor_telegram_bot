@@ -1,8 +1,9 @@
 from aiogram import Router, F, types
-
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.utils.csv_handler import CSVHandler
+from app.utils.funcs import safe_reply
+
 import os
 from dotenv import load_dotenv
 
@@ -13,7 +14,7 @@ handler = CSVHandler(FAQ_FILE_PATH)
 
 
 # [key: id -> question,answer]
-@router.callback_query(F.data == "questions")
+@router.callback_query(F.data.in_(["questions", "questions_new"]))
 async def show_faq(callback: types.CallbackQuery):
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
@@ -36,8 +37,18 @@ async def show_faq(callback: types.CallbackQuery):
             )
         )
     builder.adjust(1)
-
-    await callback.message.answer("Ось найчастіші запитання:\n", reply_markup=builder.as_markup())
+    text = "Ось найчастіші запитання:\n"
+    if callback.data == "questions_new":
+        await safe_reply(
+            message=callback.message,
+            text=text,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.answer(
+            text=text,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -54,7 +65,7 @@ async def answer_faq(callback: types.CallbackQuery):
     builder.add(
         types.InlineKeyboardButton(
             text="Назад",
-            callback_data="controller_hub_new",
+            callback_data="controller_hub",
             style="primary"
         )
     )
