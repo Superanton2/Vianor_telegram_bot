@@ -145,25 +145,21 @@ async def is_user_in_role(tg_id: int, role: str) -> bool:
         else:
             return False
 
-
 async def get_booked_times(target_date: datetime.date) -> list[str]:
     """
-    Повертає список зайнятих годин на конкретну дату у форматі ["10:00", "14:00"].
-    Враховуються лише активні записи.
+    find booked time slots in particular date
+
+    :param target_date: date were to find
+    :return: list of booked hours for concrete date in form ["10:00", "14:00"]
     """
     async with engine.begin() as conn:
-        # Вибираємо лише колонку time
         select_statement = select(bookings.c.time).where(
             (bookings.c.date == target_date) &
             (bookings.c.status == "active")
         )
         result = await conn.execute(select_statement)
 
-        # result.fetchall() повертає список рядків (Row)
-        # Рядок виглядає як (datetime.time(10, 0),) тому беремо row[0]
-        # І відразу форматуємо об'єкт часу в рядок "ГГ:ХХ"
         return [row[0].strftime("%H:%M") for row in result.fetchall()]
-
 
 async def check_if_day_full(target_date: datetime.date, total_slots: int) -> bool:
     """
@@ -182,14 +178,18 @@ async def check_if_day_full(target_date: datetime.date, total_slots: int) -> boo
         return count >= total_slots
 
 async def get_user_cars(tg_id: int):
-    """Повертає список автомобілів користувача"""
+    """
+    Повертає список автомобілів користувача
+    """
     async with engine.begin() as conn:
         select_statement = select(cars).where(cars.c.user_id == tg_id)
         result = await conn.execute(select_statement)
         return result.fetchall()
 
 async def add_booking(tg_id: int, b_date, b_time, service: str, car_number: str) -> None:
-    """Створює запис на мийку з прив'язкою до авто"""
+    """
+    Створює запис на мийку з прив'язкою до авто
+    """
     async with engine.begin() as conn:
         insert_statement = insert(bookings).values(
             date=b_date,
@@ -200,3 +200,21 @@ async def add_booking(tg_id: int, b_date, b_time, service: str, car_number: str)
             status="active"
         )
         await conn.execute(insert_statement)
+
+async def get_car_by_number(car_number: str):
+    """
+    Повертає об'єкт автомобіля з БД за його номером.
+    """
+    async with engine.begin() as conn:
+        select_statement = select(cars).where(cars.c.car_number == car_number)
+        result = await conn.execute(select_statement)
+        return result.fetchone()
+
+async def get_all_admins():
+    """
+    Повертає список всіх адміністраторів з БД
+    """
+    async with engine.begin() as conn:
+        select_statement = select(admin_list)
+        result = await conn.execute(select_statement)
+        return result.fetchall()

@@ -7,8 +7,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.db.db_requests import add_booking, get_booked_times, check_if_day_full, get_user_cars
+from app.db.db_requests import add_booking, get_booked_times, check_if_day_full, get_user_cars, get_car_by_number
 from app.utils.keyboards import create_cars_keyboard
+from app.utils.price import get_price
+from app.utils.funcs import get_car_emoji
 
 load_dotenv()
 work_hours_str = os.getenv("WORK_HOURS")
@@ -32,8 +34,13 @@ async def update_screen(message: types.Message, state: FSMContext, text: str, ma
     await message.edit_text(text, reply_markup=markup)
 
 
-@router.callback_query(F.data == "booking")
+@router.callback_query(F.data.in_(["booking", "booking_new"]))
 async def start_booking(callback: types.CallbackQuery, state: FSMContext):
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
     user_cars = await get_user_cars(callback.from_user.id)
 
     if not user_cars:
@@ -87,7 +94,7 @@ async def process_car(callback: types.CallbackQuery, state: FSMContext):
             )
 
     builder.adjust(2)
-    builder.button(text="❌ Скасувати", callback_data="ask_cancel_booking", style="success")
+    builder.button(text="Скасувати", callback_data="ask_cancel_booking", style="danger")
 
     await state.set_state(BookingForm.choosing_day)
     await update_screen(callback.message, state, f"[2/5] 📅 Оберіть день для запису авто {car_number}:",
@@ -110,7 +117,7 @@ async def process_day(callback: types.CallbackQuery, state: FSMContext):
             builder.button(
                 text=time_slot,
                 callback_data="booked_time",
-                style="danger"
+                # style="danger"
             )
         else:
             builder.button(
@@ -119,8 +126,8 @@ async def process_day(callback: types.CallbackQuery, state: FSMContext):
                 style="success"
             )
 
+    builder.button(text="Скасувати", callback_data="ask_cancel_booking", style="danger")
     builder.adjust(3)
-    builder.button(text="❌ Скасувати", callback_data="ask_cancel_booking", style="danger")
 
     await state.set_state(BookingForm.choosing_time)
     await update_screen(callback.message, state, f"[3/5] ⏰ Оберіть вільний час на {selected_date_str}:",
@@ -142,7 +149,7 @@ async def process_time(callback: types.CallbackQuery, state: FSMContext):
     builder.button(text="💦 Безконтактна мийка", callback_data="srv_Безконтактна мийка")
     builder.button(text="🧹 Пилосос", callback_data="srv_Пилосос")
     builder.button(text="✨ Комплекс", callback_data="srv_Комплекс")
-    builder.button(text="❌ Скасувати", callback_data="ask_cancel_booking", style="danger")
+    builder.button(text="Скасувати", callback_data="ask_cancel_booking", style="danger")
     builder.adjust(1)
 
     await state.set_state(BookingForm.choosing_service)
@@ -154,21 +161,27 @@ async def process_time(callback: types.CallbackQuery, state: FSMContext):
 async def process_service(callback: types.CallbackQuery, state: FSMContext):
     service = callback.data.replace("srv_", "")
     await state.update_data(service=service)
-
     data = await state.get_data()
+
+    car = await get_car_by_number(data['car_number'])
+    car_type = car.type if car else "passenger"
+
+    price = await get_price(car_type, data['service'])
+    car_emoji = get_car_emoji(car_type)
 
     text = (
         f"[5/5] 📋 <b>Перевірте деталі запису:</b>\n\n"
-        f"🚗 Авто: {data['car_number']}\n"
+        f"{car_emoji} Авто: {data['car_number']}\n"
         f"📅 Дата: {data['date']}\n"
         f"⏰ Час: {data['time']}\n"
-        f"🧽 Послуга: {data['service']}\n\n"
+        f"🧽 Послуга: {data['service']}\n"
+        f"💵 Ціка: {price}\n\n"
         f"Підтверджуєте запис?"
     )
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="✅ Підтвердити", callback_data="confirm_booking", style="success")
-    builder.button(text="❌ Скасувати", callback_data="ask_cancel_booking", style="danger")
+    builder.button(text="Підтвердити", callback_data="confirm_booking", style="success")
+    builder.button(text="Скасувати", callback_data="ask_cancel_booking", style="danger")
 
     await state.set_state(BookingForm.confirming)
     await update_screen(callback.message, state, text, builder.as_markup())
@@ -210,8 +223,8 @@ async def save_booking_final(callback: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "ask_cancel_booking")
 async def ask_cancel(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
-    builder.button(text="Так, зупинити запис", callback_data="confirm_cancel_booking")
-    builder.button(text="Ні, повернутись", callback_data="resume_booking")
+    builder.button(text="Так, зупинити запис", callback_data="confirm_cancel_booking", style="danger")
+    builder.button(text="Ні, повернутись", callback_data="resume_booking", style="primary")
     builder.adjust(1)
 
     await callback.message.edit_text(
@@ -226,9 +239,9 @@ async def confirm_cancel(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="В головне меню", callback_data="controller_hub")
+    builder.button(text="В головне меню", callback_data="controller_hub", style="primary")
 
-    await callback.message.edit_text("🚫 Запис скасовано.", reply_markup=builder.as_markup())
+    await callback.message.edit_text("Запис скасовано.", reply_markup=builder.as_markup())
     await callback.answer()
 
 
@@ -242,7 +255,6 @@ async def resume_booking(callback: types.CallbackQuery, state: FSMContext):
     if last_text and last_markup:
         await callback.message.edit_text(last_text, reply_markup=last_markup)
     else:
-        # Запобіжник, якщо стану немає
         builder = InlineKeyboardBuilder()
         builder.button(text="В головне меню", callback_data="controller_hub")
         await callback.message.edit_text("Сталася помилка відновлення. Почніть спочатку.",
@@ -250,3 +262,7 @@ async def resume_booking(callback: types.CallbackQuery, state: FSMContext):
         await state.clear()
 
     await callback.answer()
+
+@router.callback_query(F.data.in_(["booked_day", "booked_time"]))
+async def handle_booked_slot(callback: types.CallbackQuery):
+    await callback.answer("Цей слот вже повністю зайнятий ❌ Оберіть інший.", show_alert=True)
