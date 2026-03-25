@@ -7,7 +7,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.db.db_requests import add_booking, get_booked_times, check_if_day_full, get_user_cars, get_car_by_number
+from app.db.db_requests import (add_booking, get_booked_times, check_if_day_full, get_user_cars,
+                                get_car_by_number, get_active_booking_for_car)
 from app.utils.keyboards import create_cars_keyboard
 from app.utils.price import get_price
 from app.utils.funcs import get_car_emoji, get_service_emoji
@@ -71,6 +72,19 @@ async def start_booking(callback: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("book_car_"))
 async def process_car(callback: types.CallbackQuery, state: FSMContext):
     car_number = callback.data.replace("book_car_", "")
+
+    existing_booking = await get_active_booking_for_car(car_number)
+    if existing_booking:
+        b_date = existing_booking.date.strftime('%d.%m')
+        b_time = existing_booking.time.strftime('%H:%M')
+
+        await callback.answer(
+            f"❌ Це авто вже записане на {b_date} о {b_time}.\n"
+            f"Скасуйте попередній запис у профілі, щоб створити новий.",
+            show_alert=True
+        )
+        return
+
     await state.update_data(car_number=car_number)
 
     builder = InlineKeyboardBuilder()
@@ -173,16 +187,16 @@ async def process_service(callback: types.CallbackQuery, state: FSMContext):
     car_emoji = get_car_emoji(car_type)
     service_emoji = get_service_emoji(data['service'])
 
-    text = (
-        f"[5/5] 📋 <b>Перевірте деталі запису:</b>\n\n"
+    core_text = (
         f"{car_emoji} Авто: {data['car_number']}\n"
         f"📅 Дата: {data['date']}\n"
         f"⏰ Час: {data['time']}\n"
         f"{service_emoji} Послуга: {data['service']}\n"
-        f"💵 Ціна: {price}\n\n"
-        f"Підтверджуєте запис?"
+        f"💵 Ціна: {price}"
     )
+    await state.update_data(core_text=core_text)
 
+    text = f"[5/5] 📋 <b>Перевірте деталі запису:</b>\n\n{core_text}\n\nПідтверджуєте запис?"
     builder = InlineKeyboardBuilder()
     builder.button(text="Підтвердити", callback_data="confirm_booking", style="success")
     builder.button(text="Скасувати", callback_data="confirm_cancel_booking", style="danger")
@@ -212,8 +226,11 @@ async def save_booking_final(callback: types.CallbackQuery, state: FSMContext):
         builder = InlineKeyboardBuilder()
         builder.button(text="В головне меню", callback_data="controller_hub")
 
+        success_text = (f"🎉 <b>Ваш запис успішно створено!</b>\n\n"
+                        f"{data['core_text']}\n\n"
+                        f"Чекаємо на вас у визначений час!")
         await callback.message.edit_text(
-            "🎉 <b>Ваш запис успішно створено!</b>\nЧекаємо на вас у визначений час.",
+            text= success_text,
             reply_markup=builder.as_markup()
         )
     except Exception as e:

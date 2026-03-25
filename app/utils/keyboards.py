@@ -32,7 +32,7 @@ def create_cars_keyboard(user_cars) -> InlineKeyboardBuilder:
         btn_text = f"{car_emoji} {car.car_number} ({c_type})"
         builder.button(text=btn_text, callback_data=f"book_car_{car.car_number}")
 
-    builder.button(text="Назад", callback_data="controller_hub_new", style="danger")
+    builder.button(text="Назад", callback_data="controller_hub_new", style="primary")
     builder.adjust(1)
 
     return builder

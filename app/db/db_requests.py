@@ -3,6 +3,12 @@ import datetime
 from sqlalchemy import select, insert, update, func
 from app.db.db_setup import engine, bookings, admin_list, worker_list, user_list, cars
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+DAYS_TO_BOOK_LIMIT = int(os.getenv("DAYS_TO_BOOK_LIMIT"))
+
 async def add_user(tg_id: int, user_type: str, name: str = None, phone: str = None) -> None:
     """
     add user to db
@@ -218,3 +224,21 @@ async def get_all_admins():
         select_statement = select(admin_list)
         result = await conn.execute(select_statement)
         return result.fetchall()
+
+async def get_active_booking_for_car(car_number: str, days_limit: int = DAYS_TO_BOOK_LIMIT):
+    """
+    Перевіряє, чи є активний запис для машини на найближчі N днів.
+    Повертає об'єкт запису, якщо є, інакше None.
+    """
+    today = datetime.date.today()
+    end_date = today + datetime.timedelta(days=days_limit)
+
+    async with engine.begin() as conn:
+        select_statement = select(bookings).where(
+            (bookings.c.car_number == car_number) &
+            (bookings.c.status == "active") &
+            (bookings.c.date >= today) &
+            (bookings.c.date <= end_date)
+        )
+        result = await conn.execute(select_statement)
+        return result.fetchone()
