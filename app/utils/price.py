@@ -1,5 +1,5 @@
 from aiogram import Bot
-from app.db.db_requests import get_car_by_number, get_all_admins
+from app.db.db_requests import get_all_admins
 
 import traceback
 import gspread
@@ -33,9 +33,9 @@ async def get_price(car_type: str, service_type: str) -> str:
         "van": "мінівен / бус"
     }
     service_mapping = {
-        "Безконтактна мийка": "безконтактна мийка",
-        "Пилосос": "пилосос",
-        "Комплекс": "комплекс"
+        "Безконтактна мийка": "Безконтактна мийка",
+        "Мийка, Пилосос": "Мийка, Пилосос",
+        "Комплекс": "Комплекс"
     }
 
     target_car_column = car_mapping.get(car_type, car_type)

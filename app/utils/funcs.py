@@ -18,3 +18,13 @@ def get_car_emoji(car_type: str) -> str:
         return "🚐"
     else:
         return " "
+
+def get_service_emoji(service:str) -> str:
+    if service == "Безконтактна мийка":
+        return "💦"
+    elif service == "Мийка, Пилосос":
+        return "🧹"
+    elif service == "Комплекс":
+        return "✨"
+    else:
+        return "🧽"
