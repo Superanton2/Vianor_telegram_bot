@@ -242,3 +242,25 @@ async def get_active_booking_for_car(car_number: str, days_limit: int = DAYS_TO_
         )
         result = await conn.execute(select_statement)
         return result.fetchone()
+
+async def get_user_active_bookings(tg_id: int):
+    """Повертає всі активні записи користувача"""
+    today = datetime.date.today()
+    async with engine.begin() as conn:
+        select_statement = select(bookings).where(
+            (bookings.c.user_id == tg_id) &
+            (bookings.c.status == "active") &
+            (bookings.c.date >= today)
+        ).order_by(bookings.c.date, bookings.c.time)
+        result = await conn.execute(select_statement)
+        return result.fetchall()
+
+async def delete_car_from_db(car_number: str, tg_id: int):
+    """Видаляє авто користувача"""
+    async with engine.begin() as conn:
+        from sqlalchemy import delete
+        delete_statement = delete(cars).where(
+            (cars.c.car_number == car_number) &
+            (cars.c.user_id == tg_id)
+        )
+        await conn.execute(delete_statement)
