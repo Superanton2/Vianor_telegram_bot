@@ -38,11 +38,6 @@ async def update_screen(message: types.Message, state: FSMContext, text: str, ma
 
 @router.callback_query(F.data.in_(["booking", "booking_new"]))
 async def start_booking(callback: types.CallbackQuery, state: FSMContext):
-    try:
-        await callback.message.edit_reply_markup(reply_markup=None)
-    except Exception:
-        pass
-
     user_cars = await get_user_cars(callback.from_user.id)
 
     if not user_cars:
@@ -51,6 +46,76 @@ async def start_booking(callback: types.CallbackQuery, state: FSMContext):
             show_alert=True
         )
         return
+
+    # one car
+    if len(user_cars) == 1:
+        car_number = user_cars[0].car_number
+
+        existing_booking = await get_active_booking_for_car(car_number)
+        if existing_booking:
+            b_date = existing_booking.date.strftime('%d.%m')
+            b_time = existing_booking.time.strftime('%H:%M')
+            await callback.answer(
+                f"❌ Ваше авто вже записане на {b_date} о {b_time}.\n"
+                f"Скасуйте попередній запис у профілі, щоб створити новий.",
+                show_alert=True
+            )
+            return
+
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+
+        await state.update_data(car_number=car_number)
+
+        builder = InlineKeyboardBuilder()
+        today = datetime.date.today()
+
+        for i in range(7):
+            target_date = today + datetime.timedelta(days=i)
+            day_name = UKR_DAYS[target_date.weekday()]
+            is_fully_booked = await check_if_day_full(target_date, TOTAL_SLOTS)
+
+            if is_fully_booked:
+                builder.button(
+                    text=f"{target_date.strftime('%d.%m')} {day_name}",
+                    callback_data="booked_day"
+                )
+            else:
+                builder.button(
+                    text=f"{target_date.strftime('%d.%m')} {day_name}",
+                    callback_data=f"book_date_{target_date.isoformat()}",
+                    style="success"
+                )
+
+        builder.adjust(2)
+        builder.button(
+            text="Назад",
+            callback_data="controller_hub",
+            style="danger"
+        )
+
+        await state.set_state(BookingForm.choosing_day)
+        text = f"[2/5] 📅 Оберіть день для запису авто {car_number}:"
+        markup = builder.as_markup()
+
+        try:
+            await callback.message.edit_text(text, reply_markup=markup)
+            await state.update_data(main_message_id=callback.message.message_id)
+        except Exception:
+            sent_msg = await callback.message.answer(text, reply_markup=markup)
+            await state.update_data(main_message_id=sent_msg.message_id)
+
+        await state.update_data(last_text=text, last_markup=markup)
+        await callback.answer()
+        return
+
+    # couple cars
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
 
     text = "[1/5] Оберіть авто для запису:"
     markup = create_cars_keyboard(user_cars).as_markup()
@@ -110,7 +175,19 @@ async def process_car(callback: types.CallbackQuery, state: FSMContext):
             )
 
     builder.adjust(2)
-    builder.button(text="Назад", callback_data="booking", style="danger")
+    user_cars = await get_user_cars(callback.from_user.id)
+    if len(user_cars) == 1:
+        builder.button(
+            text="Назад",
+            callback_data="controller_hub",
+            style="danger"
+        )
+    else:
+        builder.button(
+            text="Назад",
+            callback_data="booking",
+            style="danger"
+        )
 
     await state.set_state(BookingForm.choosing_day)
     await update_screen(callback.message, state, f"[2/5] 📅 Оберіть день для запису авто {car_number}:",
