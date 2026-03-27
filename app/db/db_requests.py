@@ -264,3 +264,16 @@ async def delete_car_from_db(car_number: str, tg_id: int):
             (cars.c.user_id == tg_id)
         )
         await conn.execute(delete_statement)
+
+async def get_booking_by_id(booking_id: int):
+    """Шукає конкретний запис за його ID"""
+    async with engine.begin() as conn:
+        select_statement = select(bookings).where(bookings.c.id == booking_id)
+        result = await conn.execute(select_statement)
+        return result.fetchone()
+
+async def cancel_booking(booking_id: int) -> None:
+    """Змінює статус запису на скасований"""
+    async with engine.begin() as conn:
+        update_statement = update(bookings).where(bookings.c.id == booking_id).values(status="cancelled")
+        await conn.execute(update_statement)

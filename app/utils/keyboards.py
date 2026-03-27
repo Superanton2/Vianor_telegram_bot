@@ -1,13 +1,16 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.utils.funcs import get_car_emoji
 
-def create_main_user_keyboard(is_new: bool= False) -> InlineKeyboardBuilder:
+def create_main_user_keyboard(is_new: bool= False, has_booking: bool= False) -> InlineKeyboardBuilder:
     builder = InlineKeyboardBuilder()
 
     if is_new:
         builder.button(text="Зареєструватись", callback_data="registration")
     else:
+        if has_booking:
+            builder.button(text="🗓 Мій запис", callback_data="my_bookings_menu")
         builder.button(text="📅 Записатись", callback_data="booking")
+
         builder.button(text="👤 Мій профіль", callback_data="profile")
         builder.button(text="❓ Часті Питання", callback_data="questions_new")
 
