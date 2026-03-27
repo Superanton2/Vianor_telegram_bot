@@ -64,13 +64,13 @@ async def show_profile(callback: types.CallbackQuery, state: FSMContext):
 
     text = (
         f"👤 <b>ВАШ ПРОФІЛЬ</b>\n"
-        f"➖➖➖➖➖➖➖➖➖➖\n"
+        f"───────────────\n"
         f"<b>Тип:</b> {user_type_str}\n"
         f"<b>Ім'я/Назва:</b> {user.name}\n"
         f"<b>Телефон:</b> {user.phone}\n\n"
         f"<b>ВАШ ГАРАЖ:</b>\n{cars_text}\n"
         f"📅 <b>АКТИВНІ ЗАПИСИ:</b>\n{bookings_text}"
-        f"➖➖➖➖➖➖➖➖➖➖"
+        f"───────────────\n"
     )
 
     builder = InlineKeyboardBuilder()

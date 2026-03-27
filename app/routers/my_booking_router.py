@@ -44,7 +44,7 @@ async def show_my_bookings(callback: types.CallbackQuery):
             f"⏰ Час: {b_time}\n"
             f"{service_emoji} Послуга: {b.service}\n"
             f"💵 Ціна: {price} грн\n"
-            f"➖➖➖➖➖➖➖➖➖➖\n"
+            f"───────────────\n"
         )
 
         # Створюємо кнопку для зміни саме цього запису

@@ -37,8 +37,8 @@ async def cmd_start(message: types.Message):
         keyboard = kb.create_main_user_keyboard(has_booking=bool(active_bookings))
     elif await is_user_in_role(tg_id, "worker"):
         text = "Вітаю worker"
-    # elif await is_user_in_role(tg_id, "admin"):
-    #     text = "Привіт admin"
+    elif await is_user_in_role(tg_id, "admin"):
+        text = "Привіт admin"
 
     else:
         text = "Вітаю новий користувач"

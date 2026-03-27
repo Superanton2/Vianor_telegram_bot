@@ -18,6 +18,7 @@ work_hours_str = os.getenv("WORK_HOURS")
 WORK_HOURS = [hour.strip() for hour in work_hours_str.split(",")]
 TOTAL_SLOTS = len(WORK_HOURS)
 UKR_DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"]
+HOURS_BEFORE_BOOKING = float(os.getenv("HOURS_BEFORE_BOOKING", "1"))
 
 router = Router()
 
@@ -205,8 +206,15 @@ async def process_day(callback: types.CallbackQuery, state: FSMContext):
     booked_times = await get_booked_times(target_date)
 
     builder = InlineKeyboardBuilder()
+
+    now = datetime.datetime.now()
     for time_slot in WORK_HOURS:
-        if time_slot in booked_times:
+
+        slot_time = datetime.datetime.strptime(time_slot, '%H:%M').time()
+        slot_datetime = datetime.datetime.combine(target_date, slot_time)
+        time_diff = slot_datetime - now
+
+        if time_slot in booked_times or time_diff.total_seconds() < HOURS_BEFORE_BOOKING * 3600:
             builder.button(
                 text=time_slot,
                 callback_data="booked_time",
