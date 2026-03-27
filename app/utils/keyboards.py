@@ -19,7 +19,11 @@ def create_main_user_keyboard(is_new: bool= False, has_booking: bool= False) -> 
     return builder
 
 def create_main_worker_keyboard():
-    pass
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📅 Мій розклад", callback_data="worker_schedule")
+    builder.adjust(1)
+    
+    return builder
 
 def create_main_admin_keyboard():
     pass
