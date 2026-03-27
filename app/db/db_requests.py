@@ -1,12 +1,19 @@
-from sqlalchemy import select, insert, update
-from app.db.db_setup import engine, bookings, admin_list, worker_list, user_list
+import datetime
 
-async def add_user(tg_id: int, user_type: str, car_num: str, name: str = None, phone: str = None) -> None:
+from sqlalchemy import select, insert, update, func
+from app.db.db_setup import engine, bookings, admin_list, worker_list, user_list, cars
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+DAYS_TO_BOOK_LIMIT = int(os.getenv("DAYS_TO_BOOK_LIMIT"))
+
+async def add_user(tg_id: int, user_type: str, name: str = None, phone: str = None) -> None:
     """
     add user to db
     :param tg_id: telegram id of user
     :param user_type: 'individual' or 'business'
-    :param car_num: car number 'AA1234BB'
     :param name: Ures name
     :param phone: +380 ...
     :return: None
@@ -16,8 +23,23 @@ async def add_user(tg_id: int, user_type: str, car_num: str, name: str = None, p
             telegram_id=tg_id,
             type=user_type,
             name=name,
-            phone=phone,
-            car_number=car_num
+            phone=phone
+        )
+        await conn.execute(insert_statement)
+
+async def add_car(tg_id: int, car_number: str, car_type: str) -> None:
+    """
+    Add car to db
+    :param tg_id: telegram id of user
+    :param car_number: car number 'AA1234BB'
+    :param car_type: 'passenger' / 'off_roader' / 'van'
+    :return:
+    """
+    async with engine.begin() as conn:
+        insert_statement = insert(cars).values(
+            car_number=car_number,
+            type=car_type,
+            user_id=tg_id
         )
         await conn.execute(insert_statement)
 
@@ -128,3 +150,130 @@ async def is_user_in_role(tg_id: int, role: str) -> bool:
             return True
         else:
             return False
+
+async def get_booked_times(target_date: datetime.date) -> list[str]:
+    """
+    find booked time slots in particular date
+
+    :param target_date: date were to find
+    :return: list of booked hours for concrete date in form ["10:00", "14:00"]
+    """
+    async with engine.begin() as conn:
+        select_statement = select(bookings.c.time).where(
+            (bookings.c.date == target_date) &
+            (bookings.c.status == "active")
+        )
+        result = await conn.execute(select_statement)
+
+        return [row[0].strftime("%H:%M") for row in result.fetchall()]
+
+async def check_if_day_full(target_date: datetime.date, total_slots: int) -> bool:
+    """
+    Перевіряє, чи кількість активних записів на день дорівнює або перевищує
+    загальну кількість робочих годин.
+    """
+    async with engine.begin() as conn:
+        # Використовуємо SQL COUNT для швидкого підрахунку
+        select_statement = select(func.count()).select_from(bookings).where(
+            (bookings.c.date == target_date) &
+            (bookings.c.status == "active")
+        )
+        result = await conn.execute(select_statement)
+        count = result.scalar()
+
+        return count >= total_slots
+
+async def get_user_cars(tg_id: int):
+    """
+    Повертає список автомобілів користувача
+    """
+    async with engine.begin() as conn:
+        select_statement = select(cars).where(cars.c.user_id == tg_id)
+        result = await conn.execute(select_statement)
+        return result.fetchall()
+
+async def add_booking(tg_id: int, b_date, b_time, service: str, car_number: str) -> None:
+    """
+    Створює запис на мийку з прив'язкою до авто
+    """
+    async with engine.begin() as conn:
+        insert_statement = insert(bookings).values(
+            date=b_date,
+            time=b_time,
+            service=service,
+            user_id=tg_id,
+            car_number=car_number,
+            status="active"
+        )
+        await conn.execute(insert_statement)
+
+async def get_car_by_number(car_number: str):
+    """
+    Повертає об'єкт автомобіля з БД за його номером.
+    """
+    async with engine.begin() as conn:
+        select_statement = select(cars).where(cars.c.car_number == car_number)
+        result = await conn.execute(select_statement)
+        return result.fetchone()
+
+async def get_all_admins():
+    """
+    Повертає список всіх адміністраторів з БД
+    """
+    async with engine.begin() as conn:
+        select_statement = select(admin_list)
+        result = await conn.execute(select_statement)
+        return result.fetchall()
+
+async def get_active_booking_for_car(car_number: str, days_limit: int = DAYS_TO_BOOK_LIMIT):
+    """
+    Перевіряє, чи є активний запис для машини на найближчі N днів.
+    Повертає об'єкт запису, якщо є, інакше None.
+    """
+    today = datetime.date.today()
+    end_date = today + datetime.timedelta(days=days_limit)
+
+    async with engine.begin() as conn:
+        select_statement = select(bookings).where(
+            (bookings.c.car_number == car_number) &
+            (bookings.c.status == "active") &
+            (bookings.c.date >= today) &
+            (bookings.c.date <= end_date)
+        )
+        result = await conn.execute(select_statement)
+        return result.fetchone()
+
+async def get_user_active_bookings(tg_id: int):
+    """Повертає всі активні записи користувача"""
+    today = datetime.date.today()
+    async with engine.begin() as conn:
+        select_statement = select(bookings).where(
+            (bookings.c.user_id == tg_id) &
+            (bookings.c.status == "active") &
+            (bookings.c.date >= today)
+        ).order_by(bookings.c.date, bookings.c.time)
+        result = await conn.execute(select_statement)
+        return result.fetchall()
+
+async def delete_car_from_db(car_number: str, tg_id: int):
+    """Видаляє авто користувача"""
+    async with engine.begin() as conn:
+        from sqlalchemy import delete
+        delete_statement = delete(cars).where(
+            (cars.c.car_number == car_number) &
+            (cars.c.user_id == tg_id)
+        )
+        await conn.execute(delete_statement)
+
+async def get_booking_by_id(booking_id: int):
+    """Шукає конкретний запис за його ID"""
+    async with engine.begin() as conn:
+        select_statement = select(bookings).where(bookings.c.id == booking_id)
+        result = await conn.execute(select_statement)
+        return result.fetchone()
+
+async def cancel_booking(booking_id: int) -> None:
+    """Змінює статус запису на скасований"""
+    async with engine.begin() as conn:
+        update_statement = update(bookings).where(bookings.c.id == booking_id).values(status="cancelled")
+        await conn.execute(update_statement)
