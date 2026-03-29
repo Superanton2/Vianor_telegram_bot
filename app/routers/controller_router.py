@@ -14,6 +14,7 @@ from app.routers.booking_router import router as booking_router
 from app.routers.registration_router import router as registration_router
 from app.routers.profile_router import router as profile_router
 from app.routers.my_booking_router import router as my_booking_router
+from app.routers.admin_staff_manage import router as admin_router
 
 load_dotenv()
 router = Router()
@@ -23,6 +24,7 @@ router.include_routers(
     registration_router,
     profile_router,
     my_booking_router,
+    admin_router,
 )
 
 @router.message(Command("start"))
@@ -39,6 +41,7 @@ async def cmd_start(message: types.Message):
         text = "Вітаю worker"
     elif await is_user_in_role(tg_id, "admin"):
         text = "Привіт admin"
+        keyboard=  kb.create_main_admin_keyboard()
 
     else:
         text = "Вітаю новий користувач"
@@ -67,6 +70,7 @@ async def cmd_back_hub(callback: types.CallbackQuery, state: FSMContext):
         text = "Вітаю worker"
     elif await is_user_in_role(tg_id, "admin"):
         text = "Привіт admin"
+        keyboard=  kb.create_main_admin_keyboard()
 
 
     if callback.data == "controller_hub_new":

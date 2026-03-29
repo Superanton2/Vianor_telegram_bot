@@ -21,8 +21,14 @@ def create_main_user_keyboard(is_new: bool= False, has_booking: bool= False) -> 
 def create_main_worker_keyboard():
     pass
 
-def create_main_admin_keyboard():
-    pass
+def create_main_admin_keyboard() -> InlineKeyboardBuilder:
+        builder = InlineKeyboardBuilder()
+        builder.button(text="👥 Менеджмент персоналу", callback_data="admin_staff_manage")
+        builder.button(text="📦 Архів", callback_data="admin_archive")
+        builder.button(text="💰 Коригування ціни", callback_data="admin_price_edit")
+
+        builder.adjust(1)
+        return builder
 
 def create_cars_keyboard(user_cars) -> InlineKeyboardBuilder:
     builder = InlineKeyboardBuilder()

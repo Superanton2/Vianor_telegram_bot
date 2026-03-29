@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import select, insert, update, func
+from sqlalchemy import select, insert, update, func, delete
 from app.db.db_setup import engine, bookings, admin_list, worker_list, user_list, cars
 
 import os
@@ -277,3 +277,25 @@ async def cancel_booking(booking_id: int) -> None:
     async with engine.begin() as conn:
         update_statement = update(bookings).where(bookings.c.id == booking_id).values(status="cancelled")
         await conn.execute(update_statement)
+
+async def add_admin(tg_id: int, name: str) -> None:
+    """Додає нового адміністратора"""
+    async with engine.begin() as conn:
+        insert_statement = insert(admin_list).values(telegram_id=tg_id, name=name)
+        await conn.execute(insert_statement)
+
+async def remove_admin(tg_id: int) -> None:
+    """Видаляє адміністратора"""
+    async with engine.begin() as conn:
+        await conn.execute(delete(admin_list).where(admin_list.c.telegram_id == tg_id))
+
+async def get_all_workers():
+    """Повертає список всіх працівників"""
+    async with engine.begin() as conn:
+        result = await conn.execute(select(worker_list))
+        return result.fetchall()
+
+async def remove_worker(tg_id: int) -> None:
+    """Видаляє працівника"""
+    async with engine.begin() as conn:
+        await conn.execute(delete(worker_list).where(worker_list.c.telegram_id == tg_id))
