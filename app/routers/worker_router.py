@@ -15,7 +15,6 @@ UKR_DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"]
 router = Router()
 
 
-# 1. ПОКАЗУЄМО РОБОЧІ ДНІ ПРАЦІВНИКА
 @router.callback_query(F.data == "worker_schedule")
 async def show_worker_days(callback: types.CallbackQuery):
     worker = await get_worker_data(callback.from_user.id)
@@ -30,7 +29,7 @@ async def show_worker_days(callback: types.CallbackQuery):
     today = datetime.date.today()
 
 
-    for i in range(5):
+    for i in range(6):
         target_date = today + datetime.timedelta(days=i)
         weekday = target_date.weekday()
 
@@ -38,11 +37,12 @@ async def show_worker_days(callback: types.CallbackQuery):
             day_name = UKR_DAYS[weekday]
             builder.button(
                 text=f"{target_date.strftime('%d.%m')} {day_name}",
-                callback_data=f"w_date_{target_date.isoformat()}"
+                callback_data=f"w_date_{target_date.isoformat()}",
+                style="success"
             )
 
     builder.adjust(2)
-    builder.button(text="Назад", callback_data="controller_hub", style="primary")
+    # builder.button(text="Назад", callback_data="controller_hub", style="primary")
 
     await callback.message.edit_text(
         "📅 <b>Ваш розклад:</b>\nОберіть робочий день для перегляду:",
@@ -75,7 +75,7 @@ async def show_worker_slots(callback: types.CallbackQuery):
             )
 
     builder.adjust(3)
-    builder.button(text="Розклад", callback_data="worker_schedule", style="primary")
+    builder.button(text="Тиждень", callback_data="worker_schedule", style="primary")
 
     day_name = UKR_DAYS[target_date.weekday()]
     await callback.message.edit_text(
