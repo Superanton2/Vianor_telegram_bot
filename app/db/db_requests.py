@@ -277,3 +277,29 @@ async def cancel_booking(booking_id: int) -> None:
     async with engine.begin() as conn:
         update_statement = update(bookings).where(bookings.c.id == booking_id).values(status="cancelled")
         await conn.execute(update_statement)
+
+async def get_worker_data(tg_id: int):
+    """Повертає дані працівника (зокрема його робочі дні)"""
+    async with engine.begin() as conn:
+        select_statement = select(worker_list).where(worker_list.c.telegram_id == tg_id)
+        result = await conn.execute(select_statement)
+        return result.fetchone()
+
+async def get_booking_with_user_info(target_date: datetime.date, target_time: datetime.time):
+    """Повертає бронювання та дані юзера (ім'я, телефон) для конкретного слоту"""
+    async with engine.begin() as conn:
+        # Робимо JOIN таблиці bookings та user_list, щоб дістати ім'я і телефон власника
+        stmt = select(
+            bookings.c.service,
+            bookings.c.car_number,
+            user_list.c.name,
+            user_list.c.phone
+        ).select_from(
+            bookings.join(user_list, bookings.c.user_id == user_list.c.telegram_id)
+        ).where(
+            (bookings.c.date == target_date) &
+            (bookings.c.time == target_time) &
+            (bookings.c.status == "active")
+        )
+        result = await conn.execute(stmt)
+    return result.fetchone()

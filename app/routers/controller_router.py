@@ -14,6 +14,7 @@ from app.routers.booking_router import router as booking_router
 from app.routers.registration_router import router as registration_router
 from app.routers.profile_router import router as profile_router
 from app.routers.my_booking_router import router as my_booking_router
+from app.routers.worker_router import router as worker_router
 
 load_dotenv()
 router = Router()
@@ -23,6 +24,7 @@ router.include_routers(
     registration_router,
     profile_router,
     my_booking_router,
+    worker_router,
 )
 
 @router.message(Command("start"))
@@ -37,6 +39,8 @@ async def cmd_start(message: types.Message):
         keyboard = kb.create_main_user_keyboard(has_booking=bool(active_bookings))
     elif await is_user_in_role(tg_id, "worker"):
         text = "Вітаю worker"
+        keyboard = kb.create_main_worker_keyboard()
+
     elif await is_user_in_role(tg_id, "admin"):
         text = "Привіт admin"
 
@@ -65,6 +69,7 @@ async def cmd_back_hub(callback: types.CallbackQuery, state: FSMContext):
 
     elif await is_user_in_role(tg_id, "worker"):
         text = "Вітаю worker"
+        keyboard = kb.create_main_worker_keyboard()
     elif await is_user_in_role(tg_id, "admin"):
         text = "Привіт admin"
 
