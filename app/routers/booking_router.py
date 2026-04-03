@@ -11,13 +11,12 @@ from app.db.db_requests import (add_booking, get_booked_times, check_if_day_full
                                 get_car_by_number, get_active_booking_for_car)
 from app.utils.keyboards import create_cars_keyboard
 from app.utils.price import get_price
-from app.utils.funcs import get_car_emoji, get_service_emoji
+from app.utils.funcs import get_car_emoji, get_service_emoji, UKR_DAYS
 
 load_dotenv()
 work_hours_str = os.getenv("WORK_HOURS")
 WORK_HOURS = [hour.strip() for hour in work_hours_str.split(",")]
 TOTAL_SLOTS = len(WORK_HOURS)
-UKR_DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"]
 HOURS_BEFORE_BOOKING = float(os.getenv("HOURS_BEFORE_BOOKING", "1"))
 
 router = Router()

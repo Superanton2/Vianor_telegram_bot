@@ -7,14 +7,14 @@ from aiogram.fsm.context import FSMContext
 
 import app.utils.keyboards as kb
 from app.utils.funcs import safe_reply
-from app.db.db_requests import is_user_in_role, get_user, get_user_active_bookings
+from app.db.db_requests import is_user_in_role, get_user_active_bookings
 
 from app.routers.faq_router import router as faq_router
 from app.routers.booking_router import router as booking_router
 from app.routers.registration_router import router as registration_router
 from app.routers.profile_router import router as profile_router
 from app.routers.my_booking_router import router as my_booking_router
-from app.routers.admin_staff_manage import router as admin_router
+from app.routers.admin_routers.admin_staff_router import router as admin_staff_manage
 
 load_dotenv()
 router = Router()
@@ -24,7 +24,7 @@ router.include_routers(
     registration_router,
     profile_router,
     my_booking_router,
-    admin_router,
+    admin_staff_manage,
 )
 
 @router.message(Command("start"))

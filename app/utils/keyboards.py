@@ -23,7 +23,7 @@ def create_main_worker_keyboard():
 
 def create_main_admin_keyboard() -> InlineKeyboardBuilder:
         builder = InlineKeyboardBuilder()
-        builder.button(text="👥 Менеджмент персоналу", callback_data="admin_staff_manage")
+        builder.button(text="👥 Менеджмент персоналу", callback_data="admin_staff_manage_new")
         builder.button(text="📦 Архів", callback_data="admin_archive")
         builder.button(text="💰 Коригування ціни", callback_data="admin_price_edit")
 
@@ -42,6 +42,19 @@ def create_cars_keyboard(user_cars) -> InlineKeyboardBuilder:
         builder.button(text=btn_text, callback_data=f"book_car_{car.car_number}")
 
     builder.button(text="Назад", callback_data="controller_hub_new", style="primary")
+    builder.adjust(1)
+
+    return builder
+
+def create_admin_staff_keyboard(is_super_admin: bool= False) -> InlineKeyboardBuilder:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔑 Додати адміна", callback_data="add_admin")
+    builder.button(text="👥 Додати працівника", callback_data="add_worker")
+
+    if is_super_admin:
+        builder.button(text="🛡️Керування доступом", callback_data="permission_control")
+
+    builder.button(text="Назад", callback_data="controller_hub", style="primary")
     builder.adjust(1)
 
     return builder

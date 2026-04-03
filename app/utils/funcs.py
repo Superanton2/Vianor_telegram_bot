@@ -1,5 +1,19 @@
 from aiogram import types
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+import os
+from dotenv import load_dotenv
+
+import datetime
+import gspread
+import asyncio
+
+import app.db.db_requests as db
+
+load_dotenv()
+
+UKR_DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"]
 
 async def safe_reply(message: types.Message, text: str, reply_markup=None):
     try:
@@ -28,3 +42,50 @@ def get_service_emoji(service:str) -> str:
         return "✨"
     else:
         return "🧽"
+
+async def get_admin_staff_text() -> str:
+    text = "Унравління персоналом\n\n"
+    admins = await db.get_all_admins()
+    if not admins:
+        text += "Список адміністраторів порожній."
+    else:
+        text += "🔑 <b>Список адміністраторів:</b>:\n"
+        for admin in admins:
+            text += f"- <a href='tg://user?id={admin.telegram_id}'>{admin.name}</a>\n"
+
+        text += "───────────────\n"
+
+    workers = await db.get_all_workers()
+    if not workers:
+        text += "Список працівників пустий\n"
+    else:
+        # text += "🛠 <b>Список працівників:</b>:\n"
+        text += "👥 <b>Список працівників:</b>:\n"
+        for worker in workers:
+            text += f"- <a href='tg://user?id={worker.telegram_id}'>{worker.name}</a>\n"
+            if worker.work_days:
+
+                days_str = ", ".join([UKR_DAYS[day] for day in worker.work_days])
+                text += f"📅 Робочі дні: {days_str}\n"
+            else:
+                text += "📅 Робочі дні: не призначено\n"
+
+        text += "───────────────\n"
+
+    return text
+
+
+async def log_to_sheets(action_text: str):
+    """Асинхронна обгортка, щоб не блокувати бота"""
+    pass
+    # await asyncio.to_thread(sync_log_to_sheets, action_text)
+
+# def sync_log_to_sheets(action_text: str):
+    # """Синхронна функція для запису в Google Sheets"""
+    # try:
+    #     gc = gspread.service_account(filename='credentials.json')
+    #     sheet = gc.open(os.getenv("LOG_SHEET_NAME")).worksheet(os.getenv("LOG_WORKSHEET_NAME"))
+    #     now = datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+    #     sheet.append_row([now, action_text])
+    # except Exception as e:
+    #     print(f"Помилка логування: {e}")
