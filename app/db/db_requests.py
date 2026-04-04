@@ -102,34 +102,6 @@ async def get_workers_by_day(day_index: int):
         result = await conn.execute(select_statement)
         return result.fetchall()
 
-async def is_user_in_role(tg_id: int, role: str) -> bool:
-    """
-    find if telegram id is in database 'type'
-    :param tg_id: telegram id of admin or worker or user
-    :param type: admin / worker / user
-    :return:
-    """
-
-    if role == "admin":
-        db = admin_list
-    elif role == "worker":
-        db = worker_list
-    elif role == "user":
-        db = user_list
-    else:
-        raise Exception(f"No such type. You have to use 'admin', 'worker' or 'user'"
-                        f"Your type was: {role}")
-
-    async with engine.begin() as conn:
-        select_statement = select(db).where(db.c.telegram_id == tg_id)
-        result = await conn.execute(select_statement)
-
-        row = result.fetchone()
-
-        if row is not None:
-            return True
-        else:
-            return False
 
 async def get_booked_times(target_date: datetime.date) -> list[str]:
     """
@@ -197,13 +169,41 @@ async def get_car_by_number(car_number: str):
         return result.fetchone()
 
 async def get_all_admins():
-    """
-    Повертає список всіх адміністраторів з БД
-    """
+    """Повертає список тільки АКТИВНИХ адміністраторів"""
     async with engine.begin() as conn:
-        select_statement = select(admin_list)
+        select_statement = select(admin_list).where(admin_list.c.is_active == True)
         result = await conn.execute(select_statement)
         return result.fetchall()
+
+async def get_all_workers():
+    """Повертає список тільки АКТИВНИХ працівників"""
+    async with engine.begin() as conn:
+        select_statement = select(worker_list).where(worker_list.c.is_active == True)
+        result = await conn.execute(select_statement)
+        return result.fetchall()
+
+async def is_user_in_role(tg_id: int, role: str) -> bool:
+    """Перевіряє, чи має людина АКТИВНИЙ статус у своїй ролі"""
+    if role == "admin":
+        db_table = admin_list
+    elif role == "worker":
+        db_table = worker_list
+    elif role == "user":
+        db_table = user_list
+    else:
+        raise Exception("Invalid role")
+
+    async with engine.begin() as conn:
+        # 🟢 Додали перевірку на is_active == True (для юзерів можеш прибрати, якщо там немає is_active)
+        if role in ["admin", "worker"]:
+            select_statement = select(db_table).where(
+                (db_table.c.telegram_id == tg_id) & (db_table.c.is_active == True)
+            )
+        else:
+            select_statement = select(db_table).where(db_table.c.telegram_id == tg_id)
+
+        result = await conn.execute(select_statement)
+        return result.fetchone() is not None
 
 async def get_active_booking_for_car(car_number: str, days_limit: int = DAYS_TO_BOOK_LIMIT):
     """
@@ -259,34 +259,54 @@ async def cancel_booking(booking_id: int) -> None:
         await conn.execute(update_statement)
 
 async def add_admin(tg_id: int, name: str) -> None:
-    """Додає нового адміністратора"""
+    """Додає або відновлює адміністратора"""
     async with engine.begin() as conn:
-        insert_statement = insert(admin_list).values(telegram_id=tg_id, name=name)
-        await conn.execute(insert_statement)
+        check_stmt = select(admin_list).where(admin_list.c.telegram_id == tg_id)
+        result = await conn.execute(check_stmt)
+        existing = result.fetchone()
 
-async def remove_admin(tg_id: int) -> None:
-    """Видаляє адміністратора"""
-    async with engine.begin() as conn:
-        await conn.execute(delete(admin_list).where(admin_list.c.telegram_id == tg_id))
-
-async def get_all_workers():
-    """Повертає список всіх працівників"""
-    async with engine.begin() as conn:
-        result = await conn.execute(select(worker_list))
-        return result.fetchall()
-
-async def remove_worker(tg_id: int) -> None:
-    """Видаляє працівника"""
-    async with engine.begin() as conn:
-        await conn.execute(delete(worker_list).where(worker_list.c.telegram_id == tg_id))
+        if existing:
+            update_stmt = update(admin_list).where(
+                admin_list.c.telegram_id == tg_id
+            ).values(is_active=True, name=name)
+            await conn.execute(update_stmt)
+        else:
+            insert_stmt = insert(admin_list).values(
+                telegram_id=tg_id, name=name, is_active=True
+            )
+            await conn.execute(insert_stmt)
 
 async def add_worker(tg_id: int, name: str, phone: str, work_days: list[int]) -> None:
-    """Додає нового працівника в базу даних"""
+    """Додає або відновлює працівника"""
     async with engine.begin() as conn:
-        insert_statement = insert(worker_list).values(
-            telegram_id=tg_id,
-            name=name,
-            phone=phone,
-            work_days=work_days
-        )
-        await conn.execute(insert_statement)
+        check_stmt = select(worker_list).where(worker_list.c.telegram_id == tg_id)
+        result = await conn.execute(check_stmt)
+        existing = result.fetchone()
+
+        if existing:
+            update_stmt = update(worker_list).where(
+                worker_list.c.telegram_id == tg_id
+            ).values(is_active=True, name=name, phone=phone, work_days=work_days)
+            await conn.execute(update_stmt)
+        else:
+            insert_stmt = insert(worker_list).values(
+                telegram_id=tg_id, name=name, phone=phone, work_days=work_days, is_active=True
+            )
+            await conn.execute(insert_stmt)
+
+
+async def remove_admin(tg_id: int) -> None:
+    """М'яке видалення (деактивація) адміністратора"""
+    async with engine.begin() as conn:
+        update_statement = update(admin_list).where(
+            admin_list.c.telegram_id == tg_id
+        ).values(is_active=False)
+        await conn.execute(update_statement)
+
+async def remove_worker(tg_id: int) -> None:
+    """М'яке видалення (деактивація) працівника"""
+    async with engine.begin() as conn:
+        update_statement = update(worker_list).where(
+            worker_list.c.telegram_id == tg_id
+        ).values(is_active=False)
+        await conn.execute(update_statement)

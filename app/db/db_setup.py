@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy import MetaData, Table, Column, Integer, BigInteger, String, Date, Time, ForeignKey
+from sqlalchemy import MetaData, Table, Column, Integer, BigInteger, String, Date, Time, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy import select, insert
 
@@ -19,6 +19,7 @@ admin_list = Table(
     meta,
     Column("telegram_id", BigInteger, primary_key=True),
     Column("name", String, nullable=False),
+    Column("is_active", Boolean, default=True)
 )
 
 worker_list = Table(
@@ -28,6 +29,7 @@ Column("telegram_id", BigInteger, primary_key=True),
     Column("name", String, nullable=False),
     Column("phone", String),
     Column("work_days", ARRAY(Integer), nullable=True), # 0 - Mon / 6 - Sun
+    Column("is_active", Boolean, default=True)
 )
 
 user_list = Table(

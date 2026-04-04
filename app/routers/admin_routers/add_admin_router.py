@@ -4,7 +4,6 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 import app.db.db_requests as db
-from app.db.db_setup import worker_list
 from app.utils.funcs import log_to_sheets
 
 import os
@@ -167,10 +166,7 @@ async def confirm_add_admin(callback: types.CallbackQuery, state: FSMContext):
     admin_name = data.get("admin_name")
 
     try:
-        from sqlalchemy import insert
-        from app.db.db_setup import engine, admin_list
-        async with engine.begin() as conn:
-            await conn.execute(insert(worker_list).values(telegram_id=new_admin_id, name=admin_name))
+        await db.add_admin(new_admin_id, admin_name)
     except Exception as e:
         await callback.message.edit_text(f"❌ Виникла помилка БД: {e}")
         await state.clear()

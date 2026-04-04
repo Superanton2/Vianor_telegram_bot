@@ -6,6 +6,7 @@ from app.utils.keyboards import create_admin_staff_keyboard
 
 from app.routers.admin_routers.add_admin_router import router as add_admin_router
 from app.routers.admin_routers.add_worker_router import router as add_worker_router
+from app.routers.admin_routers.permission_control_router import router as permission_control_router
 
 import os
 from dotenv import load_dotenv
@@ -17,6 +18,7 @@ router = Router()
 router.include_routers(
     add_admin_router,
     add_worker_router,
+    permission_control_router
 )
 
 class AdminStates(StatesGroup):
@@ -33,11 +35,7 @@ class WorkerStates(StatesGroup):
 @router.callback_query(F.data.in_(["admin_staff_manage", "admin_staff_manage_new"]))
 async def staff_manage_menu(event: types.CallbackQuery | types.Message):
 
-    is_admin = False
-    if event.from_user.id in SUPER_ADMINS:
-        is_admin = True
-
-    keyboard = create_admin_staff_keyboard(is_admin)
+    keyboard = create_admin_staff_keyboard()
     text = await get_admin_staff_text()
 
     if isinstance(event, types.CallbackQuery):
