@@ -4,6 +4,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 import app.db.db_requests as db
+from app.db.db_setup import worker_list
 from app.utils.funcs import log_to_sheets
 
 import os
@@ -103,19 +104,6 @@ async def add_admin_step2(message: types.Message, state: FSMContext):
         await staff_manage_menu(message)
         return
 
-        # try:
-        #     await message.delete()
-        #     await message.bot.edit_message_text(
-        #         chat_id=message.chat.id,
-        #         message_id=prev_msg_id,
-        #         text="❌ Цей користувач вже є адміністратором."
-        #     )
-        # except Exception:
-        #     pass
-        # await state.clear()
-        # from app.routers.admin_routers.admin_staff_router import staff_manage_menu
-        # await staff_manage_menu(message)
-        # return
 
     await state.update_data(new_admin_id=new_admin_id)
     await state.set_state(AdminStates.waiting_for_admin_name)
@@ -182,7 +170,7 @@ async def confirm_add_admin(callback: types.CallbackQuery, state: FSMContext):
         from sqlalchemy import insert
         from app.db.db_setup import engine, admin_list
         async with engine.begin() as conn:
-            await conn.execute(insert(admin_list).values(telegram_id=new_admin_id, name=admin_name))
+            await conn.execute(insert(worker_list).values(telegram_id=new_admin_id, name=admin_name))
     except Exception as e:
         await callback.message.edit_text(f"❌ Виникла помилка БД: {e}")
         await state.clear()

@@ -1,5 +1,5 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from app.utils.funcs import get_car_emoji
+from app.utils.funcs import get_car_emoji, UKR_DAYS
 
 def create_main_user_keyboard(is_new: bool= False, has_booking: bool= False) -> InlineKeyboardBuilder:
     builder = InlineKeyboardBuilder()
@@ -57,4 +57,17 @@ def create_admin_staff_keyboard(is_super_admin: bool= False) -> InlineKeyboardBu
     builder.button(text="Назад", callback_data="controller_hub", style="primary")
     builder.adjust(1)
 
+    return builder
+
+def get_days_keyboard(selected_days: list) -> InlineKeyboardBuilder:
+    builder = InlineKeyboardBuilder()
+
+    for i, day in enumerate(UKR_DAYS):
+        if i in selected_days:
+            builder.button(text=day, callback_data=f"w_day_{i}", style="success")
+        else:
+            builder.button(text=day, callback_data=f"w_day_{i}")
+
+    builder.adjust(3, 3, 1)  # По 3 дні в ряд + неділя окремо
+    builder.button(text="Продовжити", callback_data="w_days_done", style="primary")
     return builder

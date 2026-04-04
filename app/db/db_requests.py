@@ -90,26 +90,6 @@ async def add_booking(tg_id: int, b_date, b_time, service: str) -> None:
         )
         await conn.execute(insert_statement)
 
-async def add_admin_or_worker(tg_id: int, role: str, work_days: list[int],
-                              name: str = None, phone: str = None) -> None:
-    """
-    add admin or worker to db
-    :param tg_id: telegram id of admin or worker
-    :param role: 'admin' or 'worker'
-    :param name: name
-    :param phone: new admin phone +380 ...
-    :param work_days: days when worker works. from 0 (Mon) to 6 (Sun)
-    :return: None
-    """
-    async with engine.begin() as conn:
-        insert_statement = insert(admin_list).values(
-            telegram_id=tg_id,
-            role= role,
-            name=name,
-            phone=phone,
-            work_days= work_days,
-        )
-        await conn.execute(insert_statement)
 
 async def get_workers_by_day(day_index: int):
     """
@@ -299,3 +279,14 @@ async def remove_worker(tg_id: int) -> None:
     """Видаляє працівника"""
     async with engine.begin() as conn:
         await conn.execute(delete(worker_list).where(worker_list.c.telegram_id == tg_id))
+
+async def add_worker(tg_id: int, name: str, phone: str, work_days: list[int]) -> None:
+    """Додає нового працівника в базу даних"""
+    async with engine.begin() as conn:
+        insert_statement = insert(worker_list).values(
+            telegram_id=tg_id,
+            name=name,
+            phone=phone,
+            work_days=work_days
+        )
+        await conn.execute(insert_statement)
