@@ -250,77 +250,28 @@ async def cancel_booking(booking_id: int) -> None:
         update_statement = update(bookings).where(bookings.c.id == booking_id).values(status="cancelled")
         await conn.execute(update_statement)
 
-async def add_admin(tg_id: int, name: str) -> None:
-    """Додає або відновлює адміністратора"""
+async def get_worker_data(tg_id: int):
+    """Повертає дані працівника (зокрема його робочі дні)"""
     async with engine.begin() as conn:
-        check_stmt = select(admin_list).where(admin_list.c.telegram_id == tg_id)
-        result = await conn.execute(check_stmt)
-        existing = result.fetchone()
+        select_statement = select(worker_list).where(worker_list.c.telegram_id == tg_id)
+        result = await conn.execute(select_statement)
+        return result.fetchone()
 
-        if existing:
-            update_stmt = update(admin_list).where(
-                admin_list.c.telegram_id == tg_id
-            ).values(is_active=True, name=name)
-            await conn.execute(update_stmt)
-        else:
-            insert_stmt = insert(admin_list).values(
-                telegram_id=tg_id, name=name, is_active=True
-            )
-            await conn.execute(insert_stmt)
-
-async def add_worker(tg_id: int, name: str, phone: str, work_days: list[int]) -> None:
-    """Додає або відновлює працівника"""
+async def get_booking_with_user_info(target_date: datetime.date, target_time: datetime.time):
+    """Повертає бронювання та дані юзера (ім'я, телефон) для конкретного слоту"""
     async with engine.begin() as conn:
-        check_stmt = select(worker_list).where(worker_list.c.telegram_id == tg_id)
-        result = await conn.execute(check_stmt)
-        existing = result.fetchone()
-
-        if existing:
-            update_stmt = update(worker_list).where(
-                worker_list.c.telegram_id == tg_id
-            ).values(is_active=True, name=name, phone=phone, work_days=work_days)
-            await conn.execute(update_stmt)
-        else:
-            insert_stmt = insert(worker_list).values(
-                telegram_id=tg_id, name=name, phone=phone, work_days=work_days, is_active=True
-            )
-            await conn.execute(insert_stmt)
-
-
-async def remove_admin(tg_id: int) -> None:
-    """М'яке видалення (деактивація) адміністратора"""
-    async with engine.begin() as conn:
-        update_statement = update(admin_list).where(
-            admin_list.c.telegram_id == tg_id
-        ).values(is_active=False)
-        await conn.execute(update_statement)
-
-async def remove_worker(tg_id: int) -> None:
-    """М'яке видалення (деактивація) працівника"""
-    async with engine.begin() as conn:
-        update_statement = update(worker_list).where(
-            worker_list.c.telegram_id == tg_id
-        ).values(is_active=False)
-        await conn.execute(update_statement)
-
-
-async def get_worker_for_day(b_date) -> str:
-    """Визначає, хто з активних працівників працює в заданий день"""
-    # weekday() повертає: 0 - Пн, 1 - Вт, ... 6 - Нд
-    weekday_num = b_date.weekday()
-
-    async with engine.begin() as conn:
-        result = await conn.execute(
-            select(worker_list).where(worker_list.c.is_active == True)
+        # Робимо JOIN таблиці bookings та user_list, щоб дістати ім'я і телефон власника
+        stmt = select(
+            bookings.c.service,
+            bookings.c.car_number,
+            user_list.c.name,
+            user_list.c.phone
+        ).select_from(
+            bookings.join(user_list, bookings.c.user_id == user_list.c.telegram_id)
+        ).where(
+            (bookings.c.date == target_date) &
+            (bookings.c.time == target_time) &
+            (bookings.c.status == "active")
         )
-        workers = result.fetchall()
-
-    working_staff = []
-    for w in workers:
-        if w.work_days and weekday_num in w.work_days:
-            working_staff.append(w.name)
-
-    if working_staff:
-        return ", ".join(working_staff)
-
-    return "Не призначено"
+        result = await conn.execute(stmt)
+    return result.fetchone()
