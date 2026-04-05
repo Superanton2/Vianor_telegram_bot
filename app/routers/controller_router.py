@@ -33,23 +33,26 @@ router.include_routers(
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
-    keyboard = kb.create_main_user_keyboard()
 
     tg_id = message.from_user.id
     if await is_user_in_role(tg_id, "user"):
         active_bookings = await get_user_active_bookings(tg_id)
-        text = ("👋Привіт!\nЯ бот для запису на мийку vianor. \n"
+        text = ("👋Привіт!\nЯ бот для запису на мийку Vianor. \n"
                 "Обирай дію, я допоможу тобі тут з усім\n")
         keyboard = kb.create_main_user_keyboard(has_booking=bool(active_bookings))
     elif await is_user_in_role(tg_id, "worker"):
-        text = "Вітаю worker"
+        text = ("👋Привіт!\nЯ бот для запису на мийку Vianor. \n",
+                "Обирай дію, я допоможу тобі тут з усім\n")
         keyboard = kb.create_main_worker_keyboard()
 
     elif await is_user_in_role(tg_id, "admin"):
-        text = "Привіт admin"
+        text = ("👋Привіт!\nЯ бот для запису на мийку Vianor."
+                "Це панель управліня для адмінів: ")
+        keyboard = kb.create_main_admin_keyboard()
 
     else:
-        text = "Вітаю новий користувач"
+        text = ("👋Привіт!\nЯ бот для запису на мийку Vianor.\n"
+                "Перед використання треба зреєструватись")
         keyboard = kb.create_main_user_keyboard(is_new=True)
 
     await message.reply(
@@ -67,15 +70,19 @@ async def cmd_back_hub(callback: types.CallbackQuery, state: FSMContext):
 
     tg_id = callback.from_user.id
     if await is_user_in_role(tg_id, "user"):
-        text = "👋Обери наступну дію:"
+        text = "Це центральний хаб \nОбери наступну дію:"
         active_bookings = await get_user_active_bookings(tg_id)
         keyboard = kb.create_main_user_keyboard(has_booking=bool(active_bookings))
 
     elif await is_user_in_role(tg_id, "worker"):
-        text = "Вітаю worker"
+        text = "Це центральний хаб \nОбери наступну дію:"
         keyboard = kb.create_main_worker_keyboard()
     elif await is_user_in_role(tg_id, "admin"):
-        text = "Привіт admin"
+        text = "Це центральний хаб \nОбери наступну дію:"
+        keyboard = kb.create_main_admin_keyboard()
+    else:
+        keyboard = await get_user_active_bookings(tg_id)
+        text ="Це центральний хаб"
 
 
     if callback.data == "controller_hub_new":

@@ -1,17 +1,7 @@
 from aiogram import types
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-import os
-from dotenv import load_dotenv
-
-import datetime
-import gspread
-import asyncio
 
 import app.db.db_requests as db
-
-load_dotenv()
 
 UKR_DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"]
 
