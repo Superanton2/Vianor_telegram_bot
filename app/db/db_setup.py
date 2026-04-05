@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy import MetaData, Table, Column, Integer, BigInteger, String, Date, Time, ForeignKey
+from sqlalchemy import MetaData, Table, Column, Integer, BigInteger, String, Date, Time, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy import select, insert
 
@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 BD_ENGINE = os.getenv("BD_ENGINE")
-MAIN_ADMIN_ID = int(os.getenv("MAIN_ADMIN_ID"))
+SUPER_ADMINS = [int(x) for x in os.getenv("SUPER_ADMINS").split(",")]
 work_hours_str = os.getenv("WORK_HOURS")
 WORK_HOURS = [hour.strip() for hour in work_hours_str.split(",")]
 engine = create_async_engine(BD_ENGINE, echo=False)
@@ -19,6 +19,7 @@ admin_list = Table(
     meta,
     Column("telegram_id", BigInteger, primary_key=True),
     Column("name", String, nullable=False),
+    Column("is_active", Boolean, default=True)
 )
 
 worker_list = Table(
@@ -28,6 +29,7 @@ Column("telegram_id", BigInteger, primary_key=True),
     Column("name", String, nullable=False),
     Column("phone", String),
     Column("work_days", ARRAY(Integer), nullable=True), # 0 - Mon / 6 - Sun
+    Column("is_active", Boolean, default=True)
 )
 
 user_list = Table(
@@ -55,6 +57,7 @@ bookings = Table(
     Column("date", Date, nullable=False),
     Column("time", Time, nullable=False),
     Column("service", String),
+    Column("price", Integer),
     Column("status", String, default="active"),
     Column("user_id", BigInteger, ForeignKey('user_list.telegram_id')),
     Column("car_number", String, ForeignKey('cars.car_number'))
@@ -72,5 +75,7 @@ async def init_db():
         check_admins = await conn.execute(select(admin_list))
         if check_admins.fetchone() is None:
 
-            insert_statement = insert(admin_list).values(telegram_id=MAIN_ADMIN_ID, name="Anton")
-            await conn.execute(insert_statement)
+            insert_statement1 = insert(admin_list).values(telegram_id=SUPER_ADMINS[0], name="Anton")
+            insert_statement2 = insert(admin_list).values(telegram_id=SUPER_ADMINS[1], name="Ігор")
+            await conn.execute(insert_statement1)
+            await conn.execute(insert_statement2)

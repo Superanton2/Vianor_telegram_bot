@@ -1,4 +1,3 @@
-import logging
 from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -9,6 +8,10 @@ from app.db.db_requests import (
     get_user_active_bookings, add_car, delete_car_from_db
 )
 from app.utils.funcs import get_car_emoji
+from app.utils.google_sheets import add_car_to_sheet, delete_car_from_sheet, update_user_in_sheet
+
+import asyncio
+import logging
 
 router = Router()
 
@@ -128,6 +131,12 @@ async def save_text_field(message: types.Message, state: FSMContext):
 
     await update_user_field(message.from_user.id, field_to_update, message.text)
 
+    asyncio.create_task(update_user_in_sheet(
+        tg_id=message.from_user.id,
+        field=field_to_update,
+        new_value=message.text
+    ))
+
     data = await state.get_data()
 
     # Видаляємо повідомлення юзера та старе повідомлення бота
@@ -171,6 +180,8 @@ async def delete_car_menu(callback: types.CallbackQuery, state: FSMContext):
 async def process_delete_car(callback: types.CallbackQuery):
     car_number = callback.data.replace("del_car_", "")
     await delete_car_from_db(car_number, callback.from_user.id)
+
+    asyncio.create_task(delete_car_from_sheet(car_number=car_number))
 
     builder = InlineKeyboardBuilder()
     builder.button(text="Повернутися в профіль", callback_data="profile")
@@ -228,6 +239,11 @@ async def process_add_car_number(message: types.Message, state: FSMContext):
 
     try:
         await add_car(tg_id=message.from_user.id, car_number=car_number, car_type=data['car_type'])
+
+        asyncio.create_task(add_car_to_sheet(
+            car_number=car_number, car_type=data['car_type'], tg_id=message.from_user.id
+        ))
+
         text = f"✅ Авто <code>{car_number}</code> успішно додано до вашого гаража!"
     except Exception as e:
         logging.error(f"\033[31mПомилка додавання авто: {e}\033[0m")

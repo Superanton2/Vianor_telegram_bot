@@ -1,5 +1,19 @@
 from aiogram import types
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+import os
+from dotenv import load_dotenv
+
+import datetime
+import gspread
+import asyncio
+
+import app.db.db_requests as db
+
+load_dotenv()
+
+UKR_DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"]
 
 async def safe_reply(message: types.Message, text: str, reply_markup=None):
     try:
@@ -28,3 +42,34 @@ def get_service_emoji(service:str) -> str:
         return "✨"
     else:
         return "🧽"
+
+async def get_admin_staff_text() -> str:
+    text = "Унравління персоналом\n\n"
+    admins = await db.get_all_admins()
+    if not admins:
+        text += "Список адміністраторів порожній."
+    else:
+        text += "🔑 <b>Список адміністраторів:</b>:\n"
+        for admin in admins:
+            text += f"- <a href='tg://user?id={admin.telegram_id}'>{admin.name}</a>\n"
+
+        text += "───────────────\n"
+
+    workers = await db.get_all_workers()
+    if not workers:
+        text += "Список працівників пустий\n"
+    else:
+        # text += "🛠 <b>Список працівників:</b>:\n"
+        text += "👥 <b>Список працівників:</b>:\n"
+        for worker in workers:
+            text += f"- <a href='tg://user?id={worker.telegram_id}'>{worker.name}</a>\n"
+            if worker.work_days:
+
+                days_str = ", ".join([UKR_DAYS[day] for day in worker.work_days])
+                text += f"📅 Робочі дні: {days_str}\n"
+            else:
+                text += "📅 Робочі дні: не призначено\n"
+
+        text += "───────────────\n"
+
+    return text

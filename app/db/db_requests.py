@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import select, insert, update, func
+from sqlalchemy import select, insert, update, func, delete
 from app.db.db_setup import engine, bookings, admin_list, worker_list, user_list, cars
 
 import os
@@ -72,44 +72,30 @@ async def update_user_field(tg_id: int, field_name: str, new_value: str) -> None
         )
         await conn.execute(update_statement)
 
-async def add_booking(tg_id: int, b_date, b_time, service: str) -> None:
+async def add_booking(tg_id: int, b_date, b_time, service: str, price: int, car_number: str) -> int:
     """
     add booking time to db
     :param tg_id: id of user
     :param b_date: date of booking
     :param b_time: time of booking
     :param service: type of service (cleaner/complex)
-    :return: None
+    :param price: price of the service
+    :param car_number: license plate of the car
+    :return: int: Повертаємо ID нового запису
     """
     async with engine.begin() as conn:
         insert_statement = insert(bookings).values(
             user_id=tg_id,
             date=b_date,
             time=b_time,
-            service=service
+            service=service,
+            price=price,
+            car_number=car_number,
+            status="active"
         )
-        await conn.execute(insert_statement)
+        result = await conn.execute(insert_statement)
+        return result.inserted_primary_key[0]
 
-async def add_admin_or_worker(tg_id: int, role: str, work_days: list[int],
-                              name: str = None, phone: str = None) -> None:
-    """
-    add admin or worker to db
-    :param tg_id: telegram id of admin or worker
-    :param role: 'admin' or 'worker'
-    :param name: name
-    :param phone: new admin phone +380 ...
-    :param work_days: days when worker works. from 0 (Mon) to 6 (Sun)
-    :return: None
-    """
-    async with engine.begin() as conn:
-        insert_statement = insert(admin_list).values(
-            telegram_id=tg_id,
-            role= role,
-            name=name,
-            phone=phone,
-            work_days= work_days,
-        )
-        await conn.execute(insert_statement)
 
 async def get_workers_by_day(day_index: int):
     """
@@ -122,34 +108,6 @@ async def get_workers_by_day(day_index: int):
         result = await conn.execute(select_statement)
         return result.fetchall()
 
-async def is_user_in_role(tg_id: int, role: str) -> bool:
-    """
-    find if telegram id is in database 'type'
-    :param tg_id: telegram id of admin or worker or user
-    :param type: admin / worker / user
-    :return:
-    """
-
-    if role == "admin":
-        db = admin_list
-    elif role == "worker":
-        db = worker_list
-    elif role == "user":
-        db = user_list
-    else:
-        raise Exception(f"No such type. You have to use 'admin', 'worker' or 'user'"
-                        f"Your type was: {role}")
-
-    async with engine.begin() as conn:
-        select_statement = select(db).where(db.c.telegram_id == tg_id)
-        result = await conn.execute(select_statement)
-
-        row = result.fetchone()
-
-        if row is not None:
-            return True
-        else:
-            return False
 
 async def get_booked_times(target_date: datetime.date) -> list[str]:
     """
@@ -192,20 +150,6 @@ async def get_user_cars(tg_id: int):
         result = await conn.execute(select_statement)
         return result.fetchall()
 
-async def add_booking(tg_id: int, b_date, b_time, service: str, car_number: str) -> None:
-    """
-    Створює запис на мийку з прив'язкою до авто
-    """
-    async with engine.begin() as conn:
-        insert_statement = insert(bookings).values(
-            date=b_date,
-            time=b_time,
-            service=service,
-            user_id=tg_id,
-            car_number=car_number,
-            status="active"
-        )
-        await conn.execute(insert_statement)
 
 async def get_car_by_number(car_number: str):
     """
@@ -217,13 +161,41 @@ async def get_car_by_number(car_number: str):
         return result.fetchone()
 
 async def get_all_admins():
-    """
-    Повертає список всіх адміністраторів з БД
-    """
+    """Повертає список тільки АКТИВНИХ адміністраторів"""
     async with engine.begin() as conn:
-        select_statement = select(admin_list)
+        select_statement = select(admin_list).where(admin_list.c.is_active == True)
         result = await conn.execute(select_statement)
         return result.fetchall()
+
+async def get_all_workers():
+    """Повертає список тільки АКТИВНИХ працівників"""
+    async with engine.begin() as conn:
+        select_statement = select(worker_list).where(worker_list.c.is_active == True)
+        result = await conn.execute(select_statement)
+        return result.fetchall()
+
+async def is_user_in_role(tg_id: int, role: str) -> bool:
+    """Перевіряє, чи має людина АКТИВНИЙ статус у своїй ролі"""
+    if role == "admin":
+        db_table = admin_list
+    elif role == "worker":
+        db_table = worker_list
+    elif role == "user":
+        db_table = user_list
+    else:
+        raise Exception("Invalid role")
+
+    async with engine.begin() as conn:
+        # 🟢 Додали перевірку на is_active == True (для юзерів можеш прибрати, якщо там немає is_active)
+        if role in ["admin", "worker"]:
+            select_statement = select(db_table).where(
+                (db_table.c.telegram_id == tg_id) & (db_table.c.is_active == True)
+            )
+        else:
+            select_statement = select(db_table).where(db_table.c.telegram_id == tg_id)
+
+        result = await conn.execute(select_statement)
+        return result.fetchone() is not None
 
 async def get_active_booking_for_car(car_number: str, days_limit: int = DAYS_TO_BOOK_LIMIT):
     """
