@@ -15,6 +15,7 @@ from app.routers.registration_router import router as registration_router
 from app.routers.profile_router import router as profile_router
 from app.routers.my_booking_router import router as my_booking_router
 from app.routers.admin_routers.admin_staff_router import router as admin_staff_manage
+from app.routers.admin_routers.admin_archive_router import router as admin_archive_router
 
 load_dotenv()
 router = Router()
@@ -25,6 +26,7 @@ router.include_routers(
     profile_router,
     my_booking_router,
     admin_staff_manage,
+    admin_archive_router,
 )
 
 @router.message(Command("start"))
@@ -39,9 +41,9 @@ async def cmd_start(message: types.Message):
         keyboard = kb.create_main_user_keyboard(has_booking=bool(active_bookings))
     elif await is_user_in_role(tg_id, "worker"):
         text = "Вітаю worker"
-    elif await is_user_in_role(tg_id, "admin"):
-        text = "Привіт admin"
-        keyboard=  kb.create_main_admin_keyboard()
+    # elif await is_user_in_role(tg_id, "admin"):
+    #     text = "👋Обери наступну дію:"
+    #     keyboard=  kb.create_main_admin_keyboard()
 
     else:
         text = "Вітаю новий користувач"
@@ -68,9 +70,9 @@ async def cmd_back_hub(callback: types.CallbackQuery, state: FSMContext):
 
     elif await is_user_in_role(tg_id, "worker"):
         text = "Вітаю worker"
-    elif await is_user_in_role(tg_id, "admin"):
-        text = "Привіт admin"
-        keyboard=  kb.create_main_admin_keyboard()
+    # elif await is_user_in_role(tg_id, "admin"):
+    #     text = "👋Обери наступну дію:"
+    #     keyboard=  kb.create_main_admin_keyboard()
 
 
     if callback.data == "controller_hub_new":

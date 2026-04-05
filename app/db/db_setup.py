@@ -57,6 +57,7 @@ bookings = Table(
     Column("date", Date, nullable=False),
     Column("time", Time, nullable=False),
     Column("service", String),
+    Column("price", Integer),
     Column("status", String, default="active"),
     Column("user_id", BigInteger, ForeignKey('user_list.telegram_id')),
     Column("car_number", String, ForeignKey('cars.car_number'))

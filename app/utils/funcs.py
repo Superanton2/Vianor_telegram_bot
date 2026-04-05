@@ -73,19 +73,3 @@ async def get_admin_staff_text() -> str:
         text += "───────────────\n"
 
     return text
-
-
-async def log_to_sheets(action_text: str):
-    """Асинхронна обгортка, щоб не блокувати бота"""
-    pass
-    # await asyncio.to_thread(sync_log_to_sheets, action_text)
-
-# def sync_log_to_sheets(action_text: str):
-    # """Синхронна функція для запису в Google Sheets"""
-    # try:
-    #     gc = gspread.service_account(filename='credentials.json')
-    #     sheet = gc.open(os.getenv("LOG_SHEET_NAME")).worksheet(os.getenv("LOG_WORKSHEET_NAME"))
-    #     now = datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-    #     sheet.append_row([now, action_text])
-    # except Exception as e:
-    #     print(f"Помилка логування: {e}")

@@ -72,23 +72,29 @@ async def update_user_field(tg_id: int, field_name: str, new_value: str) -> None
         )
         await conn.execute(update_statement)
 
-async def add_booking(tg_id: int, b_date, b_time, service: str) -> None:
+async def add_booking(tg_id: int, b_date, b_time, service: str, price: int, car_number: str) -> int:
     """
     add booking time to db
     :param tg_id: id of user
     :param b_date: date of booking
     :param b_time: time of booking
     :param service: type of service (cleaner/complex)
-    :return: None
+    :param price: price of the service
+    :param car_number: license plate of the car
+    :return: int: Повертаємо ID нового запису
     """
     async with engine.begin() as conn:
         insert_statement = insert(bookings).values(
             user_id=tg_id,
             date=b_date,
             time=b_time,
-            service=service
+            service=service,
+            price=price,
+            car_number=car_number,
+            status="active"
         )
-        await conn.execute(insert_statement)
+        result = await conn.execute(insert_statement)
+        return result.inserted_primary_key[0]
 
 
 async def get_workers_by_day(day_index: int):
@@ -144,20 +150,6 @@ async def get_user_cars(tg_id: int):
         result = await conn.execute(select_statement)
         return result.fetchall()
 
-async def add_booking(tg_id: int, b_date, b_time, service: str, car_number: str) -> None:
-    """
-    Створює запис на мийку з прив'язкою до авто
-    """
-    async with engine.begin() as conn:
-        insert_statement = insert(bookings).values(
-            date=b_date,
-            time=b_time,
-            service=service,
-            user_id=tg_id,
-            car_number=car_number,
-            status="active"
-        )
-        await conn.execute(insert_statement)
 
 async def get_car_by_number(car_number: str):
     """
@@ -310,3 +302,25 @@ async def remove_worker(tg_id: int) -> None:
             worker_list.c.telegram_id == tg_id
         ).values(is_active=False)
         await conn.execute(update_statement)
+
+
+async def get_worker_for_day(b_date) -> str:
+    """Визначає, хто з активних працівників працює в заданий день"""
+    # weekday() повертає: 0 - Пн, 1 - Вт, ... 6 - Нд
+    weekday_num = b_date.weekday()
+
+    async with engine.begin() as conn:
+        result = await conn.execute(
+            select(worker_list).where(worker_list.c.is_active == True)
+        )
+        workers = result.fetchall()
+
+    working_staff = []
+    for w in workers:
+        if w.work_days and weekday_num in w.work_days:
+            working_staff.append(w.name)
+
+    if working_staff:
+        return ", ".join(working_staff)
+
+    return "Не призначено"

@@ -1,17 +1,18 @@
 import datetime
 import os
 from dotenv import load_dotenv
+import asyncio
 
 from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.db.db_requests import (add_booking, get_booked_times, check_if_day_full, get_user_cars,
-                                get_car_by_number, get_active_booking_for_car)
+import app.db.db_requests as db
 from app.utils.keyboards import create_cars_keyboard
 from app.utils.price import get_price
 from app.utils.funcs import get_car_emoji, get_service_emoji, UKR_DAYS
+from app.utils.google_sheets import add_booking_to_sheet
 
 load_dotenv()
 work_hours_str = os.getenv("WORK_HOURS")
@@ -38,7 +39,7 @@ async def update_screen(message: types.Message, state: FSMContext, text: str, ma
 
 @router.callback_query(F.data.in_(["booking", "booking_new"]))
 async def start_booking(callback: types.CallbackQuery, state: FSMContext):
-    user_cars = await get_user_cars(callback.from_user.id)
+    user_cars = await db.get_user_cars(callback.from_user.id)
 
     if not user_cars:
         await callback.answer(
@@ -51,7 +52,7 @@ async def start_booking(callback: types.CallbackQuery, state: FSMContext):
     if len(user_cars) == 1:
         car_number = user_cars[0].car_number
 
-        existing_booking = await get_active_booking_for_car(car_number)
+        existing_booking = await db.get_active_booking_for_car(car_number)
         if existing_booking:
             b_date = existing_booking.date.strftime('%d.%m')
             b_time = existing_booking.time.strftime('%H:%M')
@@ -75,7 +76,7 @@ async def start_booking(callback: types.CallbackQuery, state: FSMContext):
         for i in range(7):
             target_date = today + datetime.timedelta(days=i)
             day_name = UKR_DAYS[target_date.weekday()]
-            is_fully_booked = await check_if_day_full(target_date, TOTAL_SLOTS)
+            is_fully_booked = await db.check_if_day_full(target_date, TOTAL_SLOTS)
 
             if is_fully_booked:
                 builder.button(
@@ -138,7 +139,7 @@ async def start_booking(callback: types.CallbackQuery, state: FSMContext):
 async def process_car(callback: types.CallbackQuery, state: FSMContext):
     car_number = callback.data.replace("book_car_", "")
 
-    existing_booking = await get_active_booking_for_car(car_number)
+    existing_booking = await db.get_active_booking_for_car(car_number)
     if existing_booking:
         b_date = existing_booking.date.strftime('%d.%m')
         b_time = existing_booking.time.strftime('%H:%M')
@@ -159,7 +160,7 @@ async def process_car(callback: types.CallbackQuery, state: FSMContext):
         target_date = today + datetime.timedelta(days=i)
         day_name = UKR_DAYS[target_date.weekday()]
 
-        is_fully_booked = await check_if_day_full(target_date, TOTAL_SLOTS)
+        is_fully_booked = await db.check_if_day_full(target_date, TOTAL_SLOTS)
 
         if is_fully_booked:
             builder.button(
@@ -175,7 +176,7 @@ async def process_car(callback: types.CallbackQuery, state: FSMContext):
             )
 
     builder.adjust(2)
-    user_cars = await get_user_cars(callback.from_user.id)
+    user_cars = await db.get_user_cars(callback.from_user.id)
     if len(user_cars) == 1:
         builder.button(
             text="Назад",
@@ -202,7 +203,7 @@ async def process_day(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(date=selected_date_str)
 
     target_date = datetime.date.fromisoformat(selected_date_str)
-    booked_times = await get_booked_times(target_date)
+    booked_times = await db.get_booked_times(target_date)
 
     builder = InlineKeyboardBuilder()
 
@@ -264,7 +265,7 @@ async def process_service(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(service=service)
     data = await state.get_data()
 
-    car = await get_car_by_number(data['car_number'])
+    car = await db.get_car_by_number(data['car_number'])
     car_type = car.type if car else "passenger"
 
     price = await get_price(car_type, data['service'])
@@ -299,13 +300,36 @@ async def save_booking_final(callback: types.CallbackQuery, state: FSMContext):
         b_date = datetime.date.fromisoformat(data['date'])
         b_time = datetime.datetime.strptime(data['time'], '%H:%M').time()
 
-        await add_booking(
+        car = await db.get_car_by_number(data['car_number'])
+
+        car_type = car.type if car else "passenger"
+        price = await get_price(car_type, data['service'])
+
+        if price == 0:
+            await callback.message.edit_text("❌ Виникла помилка: ціну не знайдено. Зверніться до адміністратора.")
+            await state.clear()
+            return
+
+        booking_id = await db.add_booking(
             tg_id=callback.from_user.id,
             b_date=b_date,
             b_time=b_time,
             service=data['service'],
+            price=price,
             car_number=data['car_number']
         )
+
+        worker_name = await db.get_worker_for_day(b_date)
+
+        asyncio.create_task(add_booking_to_sheet(
+            booking_id=booking_id,
+            b_date=b_date,
+            b_time=b_time,
+            car_number=data['car_number'],
+            service=data['service'],
+            worker_name=worker_name,
+            price=price
+        ))
 
         builder = InlineKeyboardBuilder()
         builder.button(text="В головне меню", callback_data="controller_hub")

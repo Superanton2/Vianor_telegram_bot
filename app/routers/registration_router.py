@@ -3,8 +3,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
+from app.utils.google_sheets import add_user_to_sheet, add_car_to_sheet
 from app.db.db_requests import add_user, add_car
 from app.utils.funcs import get_car_emoji
+
+import asyncio
 import logging
 
 router = Router()
@@ -201,6 +204,14 @@ async def process_car_number(message: types.Message, state: FSMContext):
             car_type=car_type
         )
 
+        asyncio.create_task(add_user_to_sheet(
+            tg_id=message.from_user.id, name=name, phone=phone, user_type=user_type
+        ))
+
+        asyncio.create_task(add_car_to_sheet(
+            car_number=car_number, car_type=car_type, tg_id=message.from_user.id
+        ))
+
         builder = InlineKeyboardBuilder()
         builder.button(text="Продовжити", callback_data="controller_hub")
 
@@ -223,83 +234,6 @@ async def process_car_number(message: types.Message, state: FSMContext):
         )
         await state.clear()
 
-    except Exception as e:
-        builder = InlineKeyboardBuilder()
-        builder.button(text="Спробувати ще раз", callback_data="registration")
-        logging.error(f"\033[31mПомилка БД під час реєстрації: {e}\033[0m")
-
-        await message.answer(
-            text="Виникла помилка під час збереження. Спробуйте ще раз.",
-            reply_markup=builder.as_markup()
-        )
-        await state.clear()
-
-@router.message(RegisterForm.entering_car_number, F.text)
-async def process_car_number(message: types.Message, state: FSMContext):
-    car_number = message.text.upper().strip()
-
-    data = await state.get_data()
-    user_type = data['user_type']
-    name = data['name']
-    phone = data['phone']
-    car_type = data['car_type']
-    main_msg_id = data.get("main_message_id")
-
-    try:
-        await message.delete()
-    except Exception:
-        pass
-
-
-    from app.db.db_requests import get_car_by_number
-    existing_car = await get_car_by_number(car_number)
-
-    if existing_car:
-        await message.bot.edit_message_text(
-            chat_id=message.chat.id,
-            message_id=main_msg_id,
-            text=f"❌ Авто з номером <b>{car_number}</b> вже зареєстровано!\n\n"
-                 f"[5/5] Введіть інший державний номер вашого авто:"
-        )
-        return
-
-    try:
-        await add_user(
-            tg_id=message.from_user.id,
-            user_type=user_type,
-            name=name,
-            phone=phone
-        )
-
-        await add_car(
-            tg_id=message.from_user.id,
-            car_number=car_number,
-            car_type=car_type
-        )
-
-        builder = InlineKeyboardBuilder()
-        builder.button(text="Продовжити", callback_data="controller_hub", style="success")
-
-        car_emoji = get_car_emoji(data['car_type'])
-
-        display_type = {
-            "passenger": "Легковий",
-            "off_roader": "Позашляховик",
-            "van": "Мінівен / Бус"
-        }.get(car_type, car_type)
-
-
-        await message.bot.edit_message_text(
-            chat_id=message.chat.id,
-            message_id=main_msg_id,
-            text=f"🎉 <b>Реєстрація успішна!</b>\n\n"
-                 f"👤 Ваші дані: {name}\n"
-                 f"📱 Телефон: {phone}\n"
-                 f"{car_emoji} Авто: {car_number} ({display_type})\n\n"
-                 f"Тепер ви можете записатися на мийку.",
-            reply_markup=builder.as_markup()
-        )
-        await state.clear()
     except Exception as e:
         builder = InlineKeyboardBuilder()
         builder.button(text="Спробувати ще раз", callback_data="registration")

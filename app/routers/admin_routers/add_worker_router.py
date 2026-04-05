@@ -4,11 +4,15 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 import app.db.db_requests as db
-from app.utils.funcs import log_to_sheets, UKR_DAYS
+from app.utils.funcs import UKR_DAYS
 from app.utils.keyboards import get_days_keyboard
+from app.utils.google_sheets import sync_staff_to_sheets, log_staff_action
+
+
 
 import os
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 SUPER_ADMINS = [int(x) for x in os.getenv("SUPER_ADMINS").split(",")]
@@ -245,6 +249,14 @@ async def confirm_add_worker(callback: types.CallbackQuery, state: FSMContext):
             phone=worker_phone,
             work_days=work_days
         )
+
+        asyncio.create_task(sync_staff_to_sheets())
+        action_text = f"Додав працівника: {worker_name} ({new_worker_id})"
+        asyncio.create_task(log_staff_action(
+            who_did_it=callback.from_user.full_name,
+            action_desc=action_text
+        ))
+
     except Exception as e:
         await callback.message.edit_text(f"❌ Виникла помилка БД: {e}")
         await state.clear()
@@ -275,8 +287,6 @@ async def confirm_add_worker(callback: types.CallbackQuery, state: FSMContext):
         except Exception:
             pass
 
-    log_text = f"Користувач {adder_name} додав працівника {worker_name} (ID: {new_worker_id})"
-    await log_to_sheets(log_text)
 
     await state.clear()
 

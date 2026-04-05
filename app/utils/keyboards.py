@@ -24,8 +24,8 @@ def create_main_worker_keyboard():
 def create_main_admin_keyboard() -> InlineKeyboardBuilder:
         builder = InlineKeyboardBuilder()
         builder.button(text="👥 Менеджмент персоналу", callback_data="admin_staff_manage_new")
-        builder.button(text="📦 Архів", callback_data="admin_archive")
-        builder.button(text="💰 Коригування ціни", callback_data="admin_price_edit")
+        builder.button(text="📊 Google табличка", callback_data="admin_archive")
+        builder.button(text="❓Часта питання", callback_data="questions_new")
 
         builder.adjust(1)
         return builder

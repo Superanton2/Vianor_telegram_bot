@@ -4,10 +4,11 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 import app.db.db_requests as db
-from app.utils.funcs import log_to_sheets
+from app.utils.google_sheets import sync_staff_to_sheets, log_staff_action
 
 import os
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 SUPER_ADMINS = [int(x) for x in os.getenv("SUPER_ADMINS").split(",")]
@@ -167,6 +168,14 @@ async def confirm_add_admin(callback: types.CallbackQuery, state: FSMContext):
 
     try:
         await db.add_admin(new_admin_id, admin_name)
+        asyncio.create_task(sync_staff_to_sheets())
+
+        action_text = f"Додав адміна: {admin_name} ({new_admin_id})"
+        asyncio.create_task(log_staff_action(
+            who_did_it=callback.from_user.full_name,
+            action_desc=action_text
+        ))
+
     except Exception as e:
         await callback.message.edit_text(f"❌ Виникла помилка БД: {e}")
         await state.clear()
@@ -184,14 +193,12 @@ async def confirm_add_admin(callback: types.CallbackQuery, state: FSMContext):
         try:
             await callback.bot.send_message(
                 chat_id=int(super_admin),
-                text=f"ℹ️ <b>Лог безпеки</b>\n{adder_name} додав нового адміністратора: <a href='tg://user?id={new_admin_id}'>{admin_name}</a>.",
+                text=f"ℹ️ <b>Лог безпеки</b>\n{adder_name} додав нового адміністратора: "
+                     f"<a href='tg://user?id={new_admin_id}'>{admin_name}</a>.",
                 parse_mode="HTML"
             )
         except Exception:
             pass
-
-    log_text = f"Користувач {adder_name} додав адміністратора {admin_name} (ID: {new_admin_id})"
-    await log_to_sheets(log_text)
 
     await state.clear()
 

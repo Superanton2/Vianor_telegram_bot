@@ -1,11 +1,12 @@
 from aiogram import Router, F, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.utils.funcs import log_to_sheets
+from app.utils.google_sheets import sync_staff_to_sheets, log_staff_action
 import app.db.db_requests as db
 
 import os
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 SUPER_ADMINS = [int(x) for x in os.getenv("SUPER_ADMINS").split(",")]
@@ -112,6 +113,18 @@ async def confirm_deactivate_person(callback: types.CallbackQuery):
         reply_markup=None
     )
 
+    asyncio.create_task(sync_staff_to_sheets())
+    if role == "worker":
+        sheet_name = "Workers"
+    else:
+        sheet_name = "Admins"
+
+    action_text = f"Деактивував {role_ua}: {target_name} ({target_id})"
+    asyncio.create_task(log_staff_action(
+        who_did_it=callback.from_user.full_name,
+        action_desc=action_text
+    ))
+
     adder_name = callback.from_user.full_name
     for super_admin in SUPER_ADMINS:
         try:
@@ -124,7 +137,6 @@ async def confirm_deactivate_person(callback: types.CallbackQuery):
         except Exception:
             pass
 
-    log_text = f"Користувач {adder_name} деактивував {role_ua} {target_name} (ID: {target_id})"
-    await log_to_sheets(log_text)
+
     await show_delete_menu(callback.message, callback.from_user.id, edit=False)
     await callback.answer()
